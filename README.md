@@ -37,6 +37,16 @@ Open your project's `AndroidManifest.xml` and add the following lines inside the
 npm install @pushpendersingh/react-native-scanner
 ```
 
+### Supported Formats
+
+| 1D product            | 1D industrial | 2D             |
+|:----------------------|:--------------|:---------------|
+| UPC-A                 | Code 39       | QR Code        |
+| UPC-E                 | Code 93       | Data Matrix    |
+| EAN-8                 | Code 128      | Aztec          |
+| EAN-13                | Codabar       | PDF 417        |
+|                       | ITF           |                |
+
 ## Usage
 
 To use @pushpendersingh/react-native-scanner, `import` the `@pushpendersingh/react-native-scanner` module and use the `<ReactNativeScannerView />` tag. More usage examples can be seen under the `examples/` folder.

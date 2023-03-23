@@ -20,6 +20,10 @@ Open your project's `Info.plist` and add the following lines inside the outermos
 <key>NSCameraUsageDescription</key>
 <string>Your message to user when the camera is accessed for the first time</string>
 ```
+Open your project's `Podfile` and add enable the new architecture:
+```
+:fabric_enabled => true,
+```
 
 ### Android
 
@@ -29,6 +33,10 @@ Open your project's `AndroidManifest.xml` and add the following lines inside the
 <uses-permission android:name="android.permission.CAMERA" />
 
 <uses-feature android:name="android.hardware.camera.any" />
+```
+Open your project's `gradle.properties` and add enable the new architecture:
+```
+newArchEnabled=true
 ```
 
 ### To install and start using @pushpendersingh/react-native-scanner

@@ -24,6 +24,10 @@ Open your project's `Podfile` and add enable the new architecture:
 ```
 :fabric_enabled => true,
 ```
+Run below command to enable the new architecture in IOS folder
+```
+bundle install && RCT_NEW_ARCH_ENABLED=1 bundle exec pod install
+```
 
 ### Android
 

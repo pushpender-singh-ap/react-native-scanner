@@ -86,7 +86,6 @@ using namespace facebook::react;
     }
     if (detectionString != nil)  {
       if (_eventEmitter != nullptr) {
-
         std::dynamic_pointer_cast<const facebook::react::ReactNativeScannerViewEventEmitter>(_eventEmitter)->onQrScanned(facebook::react::ReactNativeScannerViewEventEmitter::OnQrScanned{
         .value = std::string([detectionString UTF8String])
         });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Alert,
   Platform,
@@ -13,10 +13,10 @@ import {
   openSettings,
   RESULTS,
 } from 'react-native-permissions';
-import { ReactNativeScannerView } from '@pushpendersingh/react-native-scanner';
+import {ReactNativeScannerView} from '@pushpendersingh/react-native-scanner';
 
 export default function App() {
-  const { height, width } = useWindowDimensions();
+  const {height, width} = useWindowDimensions();
   const [isCameraPermissionGranted, setIsCameraPermissionGranted] =
     useState(false);
 
@@ -28,7 +28,7 @@ export default function App() {
     request(
       Platform.OS === 'ios'
         ? PERMISSIONS.IOS.CAMERA
-        : PERMISSIONS.ANDROID.CAMERA
+        : PERMISSIONS.ANDROID.CAMERA,
     ).then(async (result: any) => {
       switch (result) {
         case RESULTS.UNAVAILABLE:
@@ -37,7 +37,7 @@ export default function App() {
         case RESULTS.DENIED:
           Alert.alert(
             'Permission Denied',
-            'You need to grant camera permission first'
+            'You need to grant camera permission first',
           );
           openSettings();
           break;
@@ -47,7 +47,7 @@ export default function App() {
         case RESULTS.BLOCKED:
           Alert.alert(
             'Permission Blocked',
-            'You need to grant camera permission first'
+            'You need to grant camera permission first',
           );
           openSettings();
           break;
@@ -57,9 +57,9 @@ export default function App() {
 
   if (isCameraPermissionGranted) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{flex: 1}}>
         <ReactNativeScannerView
-          style={{ height, width }}
+          style={{height, width}}
           onQrScanned={(value: any) => {
             console.log(value.nativeEvent);
           }}
@@ -68,7 +68,7 @@ export default function App() {
     );
   } else {
     return (
-      <Text style={{ fontSize: 30, color: 'red' }}>
+      <Text style={{fontSize: 30, color: 'red'}}>
         You need to grant camera permission first
       </Text>
     );

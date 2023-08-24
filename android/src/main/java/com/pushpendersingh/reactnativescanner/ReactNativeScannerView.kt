@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
 import android.view.Choreographer
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -137,8 +136,6 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         .addOnSuccessListener { barcodeList ->
           val barcode =
             barcodeList.getOrNull(0) // `rawValue` is the decoded value of the barcode
-
-          // Log.e("adasdasd", barcodeList.getOrNull(0)?.cornerPoints.v);
           barcode?.let { value ->
             // mCameraProvider?.unbindAll() // this line will stop the camera from scanning after the first scan
             val reactContext = context as ReactContext

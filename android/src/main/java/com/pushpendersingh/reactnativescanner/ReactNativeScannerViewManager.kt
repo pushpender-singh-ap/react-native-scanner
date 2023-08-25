@@ -28,9 +28,9 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
   }
 
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
-    val reactnativeScannerView = ReactNativeScannerView(mCallerContext)
-    reactnativeScannerView.setUpCamera(mCallerContext)
-    return reactnativeScannerView
+    val scannerView = ReactNativeScannerView(mCallerContext)
+    scannerView.setUpCamera(mCallerContext)
+    return scannerView
   }
 
   companion object {

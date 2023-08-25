@@ -41,7 +41,7 @@ class ReactNativeScannerViewEvent(
     return event
   }
 
-  fun getPoints(points: Array<Point>): WritableArray {
+  private fun getPoints(points: Array<Point>): WritableArray {
     val origin: WritableArray = Arguments.createArray()
     for (point in points) {
       val pointData: WritableMap = Arguments.createMap()
@@ -51,5 +51,4 @@ class ReactNativeScannerViewEvent(
     }
     return origin
   }
-
 }

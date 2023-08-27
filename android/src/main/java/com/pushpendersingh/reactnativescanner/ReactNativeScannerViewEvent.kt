@@ -7,26 +7,19 @@ import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.events.Event
 import com.facebook.react.uimanager.events.RCTModernEventEmitter
+import com.google.mlkit.vision.barcode.common.Barcode
 
 class ReactNativeScannerViewEvent(
   surfaceId: Int,
   viewId: Int,
-  private val rect: Rect,
   private val qrValue: String,
-  private val origin: Array<Point>
-) : Event<ReactNativeScannerViewEvent>(surfaceId, viewId) {
+  private val rect: Rect,
+  private val origin: Array<Point>,
+  private val type: Int
+  ) : Event<ReactNativeScannerViewEvent>(surfaceId, viewId) {
 
   override fun getEventName(): String {
     return "topOnQrScanned"
-  }
-
-  override fun dispatchModern(rctEventEmitter: RCTModernEventEmitter?) {
-    super.dispatchModern(rctEventEmitter) // if we don't call this, the react native part won't receive the event but because of this line event call two times
-    rctEventEmitter?.receiveEvent(
-      -1,
-      viewTag, eventName,
-      Arguments.createMap()
-    )
   }
 
   override fun getEventData(): WritableMap {
@@ -38,6 +31,11 @@ class ReactNativeScannerViewEvent(
 
     event.putMap("bounds", bounds)
     event.putString("data", qrValue)
+    if (type == Barcode.FORMAT_QR_CODE)
+      event.putString("type", "QR_CODE")
+    else
+      event.putString("type", "UNKNOWN")
+
     return event
   }
 

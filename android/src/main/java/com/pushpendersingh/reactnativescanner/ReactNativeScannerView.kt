@@ -134,23 +134,23 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
       barcodeScanner.process(inputImage)
         .addOnSuccessListener { barcodeList ->
-          val barcode =
-            barcodeList.getOrNull(0) // `rawValue` is the decoded value of the barcode
-          barcode?.let { value ->
-            // mCameraProvider?.unbindAll() // this line will stop the camera from scanning after the first scan
-            val reactContext = context as ReactContext
-            val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
-            val eventDispatcher: EventDispatcher? =
-              UIManagerHelper.getEventDispatcherForReactTag(
-                reactContext, id
-              )
-            eventDispatcher?.dispatchEvent(value.cornerPoints?.let {
-              value.boundingBox?.let { it1 ->
-                ReactNativeScannerViewEvent(surfaceId, id, it1,value.rawValue?:"",
-                  it
-                )
-              }
-            })
+          // mCameraProvider?.unbindAll() // this line will stop the camera from scanning after the first scan
+          val reactContext = context as ReactContext
+          val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
+          val eventDispatcher: EventDispatcher? =
+            UIManagerHelper.getEventDispatcherForReactTag(
+              reactContext, id
+            )
+
+          barcodeList.forEach { barcode ->
+            barcode?.let { code ->
+              eventDispatcher?.dispatchEvent(code.cornerPoints?.let { cornerPoints ->
+                code.boundingBox?.let { bounds ->
+                  ReactNativeScannerViewEvent(surfaceId, id, code.rawValue
+                    ?: "", bounds, cornerPoints, code.format)
+                }
+              })
+            }
           }
         }
         .addOnFailureListener {

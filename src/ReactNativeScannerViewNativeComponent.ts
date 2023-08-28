@@ -1,5 +1,6 @@
 import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
-import type { ViewProps } from 'react-native';
+import codegenNativeCommands from 'react-native/Libraries/Utilities/codegenNativeCommands';
+import type { HostComponent, ViewProps } from 'react-native';
 import type { DirectEventHandler, Int32, Double } from 'react-native/Libraries/Types/CodegenTypes';
 
 type Event = Readonly<{
@@ -18,7 +19,17 @@ type Event = Readonly<{
   target: Int32;
 }>;
 
+export interface NativeCommands {
+  pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+  resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+}
+
+export const Commands = codegenNativeCommands<NativeCommands>({
+  supportedCommands: ['pausePreview', 'resumePreview'],
+});
+
 interface NativeProps extends ViewProps {
+  pauseAfterCapture?: boolean,
   onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
 }
 

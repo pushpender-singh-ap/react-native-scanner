@@ -10,7 +10,7 @@
 using namespace facebook::react;
 
 @interface ReactNativeScannerView () <RCTReactNativeScannerViewViewProtocol>
-
+@property Boolean pauseAfterCapture;
 @end
 
 @implementation ReactNativeScannerView {
@@ -70,6 +70,10 @@ using namespace facebook::react;
 {
     if (_eventEmitter == nullptr) {
         return;
+    }
+    
+    if (self.pauseAfterCapture == true) {
+        [[_prevLayer connection] setEnabled:NO];
     }
     
     NSArray *barCodeTypes = @[AVMetadataObjectTypeUPCECode, AVMetadataObjectTypeCode39Code, AVMetadataObjectTypeCode39Mod43Code,
@@ -140,12 +144,39 @@ using namespace facebook::react;
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
+    const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
+    const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
+
+#define REMAP_WEBVIEW_PROP(name)                    \
+    if (oldViewProps.name != newViewProps.name) {   \
+        self.name = newViewProps.name;             \
+    }
+
+#define REMAP_WEBVIEW_STRING_PROP(name)                             \
+    if (oldViewProps.name != newViewProps.name) {                   \
+        self.name = RCTNSStringFromString(newViewProps.name);      \
+    }
+
+    REMAP_WEBVIEW_PROP(pauseAfterCapture)
+    
     [super updateProps:props oldProps:oldProps];
 }
 
 - (void)updateLayoutMetrics:(const facebook::react::LayoutMetrics &)layoutMetrics oldLayoutMetrics:(const facebook::react::LayoutMetrics &)oldLayoutMetrics{
     [super updateLayoutMetrics:layoutMetrics oldLayoutMetrics:oldLayoutMetrics];
     _prevLayer.frame = [_view.layer bounds];
+}
+
+- (void)handleCommand:(nonnull const NSString *)commandName args:(nonnull const NSArray *)args {
+    
+}
+
+- (void)pausePreview {
+    [[_prevLayer connection] setEnabled:NO];
+}
+
+- (void)resumePreview {
+    [[_prevLayer connection] setEnabled:YES];
 }
 
 @end

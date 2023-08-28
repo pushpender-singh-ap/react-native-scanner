@@ -68,7 +68,7 @@ using namespace facebook::react;
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputMetadataObjects:(NSArray *)metadataObjects fromConnection:(AVCaptureConnection *)connection
 {
-    if (_eventEmitter != nullptr) {
+    if (_eventEmitter == nullptr) {
         return;
     }
     
@@ -91,23 +91,32 @@ using namespace facebook::react;
             NSArray *corners = barCodeObject.corners;
             NSString *codeString = [(AVMetadataMachineReadableCodeObject *)metadata stringValue];
             
-            CGPoint *topLeft = nullptr, *bottomLeft = nullptr, *bottomRight = nullptr, *topRight = nullptr;
+            CGPoint topLeft, bottomLeft, bottomRight, topRight = CGPointMake(0, 0);
             
-            if(corners.count == 4) {
-                CGPointMakeWithDictionaryRepresentation((CFDictionaryRef)corners[0], topLeft);
-                CGPointMakeWithDictionaryRepresentation((CFDictionaryRef)corners[1], bottomLeft);
-                CGPointMakeWithDictionaryRepresentation((CFDictionaryRef)corners[2], bottomRight);
-                CGPointMakeWithDictionaryRepresentation((CFDictionaryRef)corners[3], topRight);
+            if (corners.count >= 0) {
+                topLeft = [self mapObject: corners[0]];
+            }
+            
+            if (corners.count >= 1) {
+                bottomLeft = [self mapObject: corners[1]];
+            }
+            
+            if (corners.count >= 2) {
+                bottomRight = [self mapObject: corners[2]];
+            }
+            
+            if (corners.count >= 3) {
+                topRight = [self mapObject: corners[3]];
             }
             
             facebook::react::ReactNativeScannerViewEventEmitter::OnQrScannedBounds bounds = {
                 .width = highlightViewRect.size.width,
                 .height = highlightViewRect.size.height,
                 .origin = {
-                    .topLeft = {.x = topLeft->x, .y = topLeft->y},
-                    .bottomLeft = {.x = bottomLeft->x, .y = bottomLeft->y},
-                    .bottomRight = {.x = bottomRight->x, .y = bottomRight->y},
-                    .topRight = {.x = topRight->x, .y = topRight->y}
+                    .topLeft = {.x = topLeft.x, .y = topLeft.y},
+                    .bottomLeft = {.x = bottomLeft.x, .y = bottomLeft.y},
+                    .bottomRight = {.x = bottomRight.x, .y = bottomRight.y},
+                    .topRight = {.x = topRight.x, .y = topRight.y}
                 }
             };
             
@@ -119,6 +128,14 @@ using namespace facebook::react;
             });
         }
     }
+}
+
+- (CGPoint)mapObject:(NSDictionary *)object {
+    if (object == nil) {
+        return CGPointMake(0, 0);
+    }
+    
+    return CGPointMake([[object objectForKey:@"X"] doubleValue], [[object objectForKey:@"Y"] doubleValue]);
 }
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps

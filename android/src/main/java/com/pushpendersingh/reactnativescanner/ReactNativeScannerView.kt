@@ -31,12 +31,15 @@ import java.util.concurrent.Executors
 class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
   private var preview: PreviewView
+  private var mSurfacePreview: Preview? = null
   private var mCameraProvider: ProcessCameraProvider? = null
   private lateinit var cameraExecutor: ExecutorService
   private lateinit var options: BarcodeScannerOptions
   private lateinit var scanner: BarcodeScanner
   private var analysisUseCase: ImageAnalysis = ImageAnalysis.Builder()
     .build()
+  private var hasSetSurfaceProvider: Boolean = false
+  private var pauseAfterCapture: Boolean = false
 
   companion object {
     private const val REQUEST_CODE_PERMISSIONS = 10
@@ -116,6 +119,9 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
       // newSingleThreadExecutor() will let us perform analysis on a single worker thread
       Executors.newSingleThreadExecutor()
     ) { imageProxy ->
+      if (pauseAfterCapture) {
+        pauseCamera()
+      }
       processImageProxy(scanner, imageProxy)
     }
   }
@@ -187,6 +193,8 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         .also {
           it.setSurfaceProvider(preview.surfaceProvider)
         }
+      mSurfacePreview = surfacePreview
+      hasSetSurfaceProvider = true
 
       // Select back camera as a default
       val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -208,5 +216,23 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
       }
 
     }, ContextCompat.getMainExecutor(context))
+  }
+
+  fun pauseAfterCapture(value: Boolean) {
+    pauseAfterCapture = value
+  }
+
+  fun pauseCamera() {
+    if (hasSetSurfaceProvider) {
+      hasSetSurfaceProvider = false
+      mSurfacePreview?.setSurfaceProvider(null)
+    }
+  }
+
+  fun resumeCamera() {
+    if (!hasSetSurfaceProvider) {
+      hasSetSurfaceProvider = true
+      mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
+    }
   }
 }

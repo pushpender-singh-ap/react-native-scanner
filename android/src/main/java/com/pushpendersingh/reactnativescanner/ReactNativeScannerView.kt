@@ -218,21 +218,21 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     }, ContextCompat.getMainExecutor(context))
   }
 
-  fun pauseAfterCapture(value: Boolean) {
+  fun setPauseAfterCapture(value: Boolean) {
     pauseAfterCapture = value
   }
 
   fun pauseCamera() {
     if (hasSetSurfaceProvider) {
       hasSetSurfaceProvider = false
-      mSurfacePreview?.setSurfaceProvider(null)
+      //mSurfacePreview?.setSurfaceProvider(null)
     }
   }
 
   fun resumeCamera() {
     if (!hasSetSurfaceProvider) {
       hasSetSurfaceProvider = true
-      mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
+      //mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
     }
   }
 }

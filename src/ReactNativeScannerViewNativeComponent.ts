@@ -19,6 +19,11 @@ type Event = Readonly<{
   target: Int32;
 }>;
 
+interface NativeProps extends ViewProps {
+  pauseAfterCapture?: boolean,
+  onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
+}
+
 export interface NativeCommands {
   pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
@@ -28,9 +33,6 @@ export const Commands = codegenNativeCommands<NativeCommands>({
   supportedCommands: ['pausePreview', 'resumePreview'],
 });
 
-interface NativeProps extends ViewProps {
-  pauseAfterCapture?: boolean,
-  onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
-}
-
-export default codegenNativeComponent<NativeProps>('ReactNativeScannerView');
+export default codegenNativeComponent<NativeProps>(
+  'ReactNativeScannerView'
+) as HostComponent<NativeProps>;

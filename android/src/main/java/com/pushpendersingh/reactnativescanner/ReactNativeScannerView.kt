@@ -119,9 +119,6 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
       // newSingleThreadExecutor() will let us perform analysis on a single worker thread
       Executors.newSingleThreadExecutor()
     ) { imageProxy ->
-      if (pauseAfterCapture) {
-        pauseCamera()
-      }
       processImageProxy(scanner, imageProxy)
     }
   }
@@ -141,21 +138,28 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
       barcodeScanner.process(inputImage)
         .addOnSuccessListener { barcodeList ->
           // mCameraProvider?.unbindAll() // this line will stop the camera from scanning after the first scan
-          val reactContext = context as ReactContext
-          val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
-          val eventDispatcher: EventDispatcher? =
-            UIManagerHelper.getEventDispatcherForReactTag(
-              reactContext, id
-            )
 
-          barcodeList.forEach { barcode ->
-            barcode?.let { code ->
-              eventDispatcher?.dispatchEvent(code.cornerPoints?.let { cornerPoints ->
-                code.boundingBox?.let { bounds ->
-                  ReactNativeScannerViewEvent(surfaceId, id, code.rawValue
-                    ?: "", bounds, cornerPoints, code.format)
-                }
-              })
+          if (barcodeList.isNotEmpty()) {
+            if (pauseAfterCapture) {
+              pausePreview()
+            }
+
+            val reactContext = context as ReactContext
+            val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
+            val eventDispatcher: EventDispatcher? =
+              UIManagerHelper.getEventDispatcherForReactTag(
+                reactContext, id
+              )
+
+            barcodeList.forEach { barcode ->
+              barcode?.let { code ->
+                eventDispatcher?.dispatchEvent(code.cornerPoints?.let { cornerPoints ->
+                  code.boundingBox?.let { bounds ->
+                    ReactNativeScannerViewEvent(surfaceId, id, code.rawValue
+                      ?: "", bounds, cornerPoints, code.format)
+                  }
+                })
+              }
             }
           }
         }
@@ -180,7 +184,6 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
   }
 
   private fun startCamera(reactApplicationContext: ReactApplicationContext) {
-
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
     cameraProviderFuture.addListener({
@@ -210,11 +213,9 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
           surfacePreview,
           analysisUseCase
         )
-
       } catch (exc: Exception) {
 
       }
-
     }, ContextCompat.getMainExecutor(context))
   }
 
@@ -222,17 +223,17 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     pauseAfterCapture = value
   }
 
-  fun pauseCamera() {
+  fun pausePreview() {
     if (hasSetSurfaceProvider) {
       hasSetSurfaceProvider = false
-      //mSurfacePreview?.setSurfaceProvider(null)
+      mSurfacePreview?.setSurfaceProvider(null)
     }
   }
 
-  fun resumeCamera() {
+  fun resumePreview() {
     if (!hasSetSurfaceProvider) {
       hasSetSurfaceProvider = true
-      //mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
+      mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
     }
   }
 }

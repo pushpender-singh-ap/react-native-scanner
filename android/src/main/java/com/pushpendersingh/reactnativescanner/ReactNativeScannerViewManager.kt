@@ -1,6 +1,7 @@
 package com.pushpendersingh.reactnativescanner
 
 import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.common.MapBuilder
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
@@ -20,7 +21,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     mDelegate = ReactNativeScannerViewManagerDelegate(this)
   }
 
-  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView>? {
+  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView> {
     return mDelegate
   }
 
@@ -36,6 +37,9 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   companion object {
     const val NAME = "ReactNativeScannerView"
+
+    const val COMMAND_PAUSE_PREVIEW = 1
+    const val COMMAND_RESUME_PREVIEW = 2
   }
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
@@ -45,16 +49,35 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     )
   }
 
+  override fun getCommandsMap(): MutableMap<String, Int> {
+    val map = mutableMapOf<String, Int>()
+    map["pausePreview"] = COMMAND_PAUSE_PREVIEW
+    map["resumePreview"] = COMMAND_RESUME_PREVIEW
+    return map
+  }
+
+  override fun receiveCommand(root: ReactNativeScannerView, commandId: String?, args: ReadableArray?) {
+    when (commandId) {
+      "pausePreview" -> root.pausePreview()
+      "resumePreview" -> root.resumePreview()
+      else -> {
+        println("Unsupported Command")
+      }
+    }
+
+    super.receiveCommand(root, commandId, args)
+  }
+
   @ReactProp(name = "pauseAfterCapture")
   override fun setPauseAfterCapture(view: ReactNativeScannerView?, value: Boolean) {
     view?.setPauseAfterCapture(value)
   }
 
   override fun pausePreview(view: ReactNativeScannerView?) {
-    view?.pauseCamera()
+    view?.pausePreview()
   }
 
   override fun resumePreview(view: ReactNativeScannerView?) {
-    view?.resumeCamera()
+    view?.resumePreview()
   }
 }

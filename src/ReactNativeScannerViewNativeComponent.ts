@@ -24,15 +24,18 @@ interface NativeProps extends ViewProps {
   onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
 }
 
-export interface NativeCommands {
-  pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
-  resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+type ComponentType = HostComponent<NativeProps>;
+
+interface NativeCommands {
+  pausePreview: (viewRef: React.ElementRef<ComponentType>) => void;
+  resumePreview: (viewRef: React.ElementRef<ComponentType>) => void;
 }
 
-export const Commands = codegenNativeCommands<NativeCommands>({
-  supportedCommands: ['pausePreview', 'resumePreview'],
+export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
+  supportedCommands: [
+    'pausePreview',
+    'resumePreview'
+  ],
 });
 
-export default codegenNativeComponent<NativeProps>(
-  'ReactNativeScannerView'
-) as HostComponent<NativeProps>;
+export default codegenNativeComponent<NativeProps>('ReactNativeScannerView', {})

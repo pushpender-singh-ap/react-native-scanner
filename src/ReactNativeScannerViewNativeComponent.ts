@@ -19,16 +19,14 @@ type Event = Readonly<{
   target: Int32;
 }>;
 
-interface NativeProps extends ViewProps {
+export interface NativeProps extends ViewProps {
   pauseAfterCapture?: boolean,
   onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
 }
 
-type ComponentType = HostComponent<NativeProps>;
-
 interface NativeCommands {
-  pausePreview: (viewRef: React.ElementRef<ComponentType>) => void;
-  resumePreview: (viewRef: React.ElementRef<ComponentType>) => void;
+  pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+  resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
 }
 
 export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
@@ -38,4 +36,6 @@ export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
   ],
 });
 
-export default codegenNativeComponent<NativeProps>('ReactNativeScannerView', {})
+export default codegenNativeComponent<NativeProps>(
+  'ReactNativeScannerView', {}
+) as HostComponent<NativeProps>;

@@ -15,7 +15,6 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.EventDispatcher
@@ -24,7 +23,6 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import java.util.Arrays
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -33,16 +31,16 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
   private var preview: PreviewView
   private var mSurfacePreview: Preview? = null
   private var mCameraProvider: ProcessCameraProvider? = null
-  private lateinit var cameraExecutor: ExecutorService
-  private lateinit var options: BarcodeScannerOptions
-  private lateinit var scanner: BarcodeScanner
   private var analysisUseCase: ImageAnalysis = ImageAnalysis.Builder()
     .build()
-  private var hasSetSurfaceProvider: Boolean = false
+
+  private lateinit var options: BarcodeScannerOptions
+  private lateinit var scanner: BarcodeScanner
+
+  private var isCameraRunning: Boolean = false
   private var pauseAfterCapture: Boolean = false
 
   companion object {
-    private const val REQUEST_CODE_PERMISSIONS = 10
     private val REQUIRED_PERMISSIONS =
       mutableListOf(
         Manifest.permission.CAMERA
@@ -89,12 +87,13 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     }
   }
 
-  fun setUpCamera(reactApplicationContext: ReactApplicationContext) {
+  fun setUpCamera() {
     if (allPermissionsGranted()) {
-      startCamera(reactApplicationContext)
+      startCamera()
     }
 
-    cameraExecutor = Executors.newSingleThreadExecutor()
+    // newSingleThreadExecutor() will let us perform analysis on a single worker thread
+    val cameraExecutor = Executors.newSingleThreadExecutor()
 
     options = BarcodeScannerOptions.Builder()
       .setBarcodeFormats(
@@ -116,8 +115,7 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     scanner = BarcodeScanning.getClient(options)
 
     analysisUseCase.setAnalyzer(
-      // newSingleThreadExecutor() will let us perform analysis on a single worker thread
-      Executors.newSingleThreadExecutor()
+      cameraExecutor
     ) { imageProxy ->
       processImageProxy(scanner, imageProxy)
     }
@@ -134,6 +132,10 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
           image,
           imageProxy.imageInfo.rotationDegrees
         )
+
+      if (!isCameraRunning) {
+        return;
+      }
 
       barcodeScanner.process(inputImage)
         .addOnSuccessListener { barcodeList ->
@@ -183,13 +185,15 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     ) == PackageManager.PERMISSION_GRANTED
   }
 
-  private fun startCamera(reactApplicationContext: ReactApplicationContext) {
-    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+  private fun startCamera() {
+    val reactContext = context as ReactContext
+    val cameraProviderFuture = ProcessCameraProvider.getInstance(reactContext)
 
     cameraProviderFuture.addListener({
       // Used to bind the lifecycle of cameras to the lifecycle owner
-      val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+      val cameraProvider = cameraProviderFuture.get()
       mCameraProvider = cameraProvider
+
       // Preview
       val surfacePreview = Preview.Builder()
         .build()
@@ -197,10 +201,11 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
           it.setSurfaceProvider(preview.surfaceProvider)
         }
       mSurfacePreview = surfacePreview
-      hasSetSurfaceProvider = true
 
       // Select back camera as a default
       val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+      isCameraRunning = true
 
       try {
         // Unbind use cases before rebinding
@@ -208,13 +213,13 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
         // Bind use cases to camera
         cameraProvider.bindToLifecycle(
-          (reactApplicationContext.currentActivity as AppCompatActivity),
+          (reactContext.currentActivity as AppCompatActivity),
           cameraSelector,
           surfacePreview,
           analysisUseCase
         )
       } catch (exc: Exception) {
-
+        isCameraRunning = false
       }
     }, ContextCompat.getMainExecutor(context))
   }
@@ -224,16 +229,29 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
   }
 
   fun pausePreview() {
-    if (hasSetSurfaceProvider) {
-      hasSetSurfaceProvider = false
-      mSurfacePreview?.setSurfaceProvider(null)
+    if (isCameraRunning) {
+      isCameraRunning = false
+      mCameraProvider?.unbind(analysisUseCase)
     }
   }
 
   fun resumePreview() {
-    if (!hasSetSurfaceProvider) {
-      hasSetSurfaceProvider = true
-      mSurfacePreview?.setSurfaceProvider(preview.surfaceProvider)
+    if (!isCameraRunning) {
+      isCameraRunning = true
+
+      try {
+        val reactContext = context as ReactContext
+        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+        // Bind use cases to camera
+        mCameraProvider?.bindToLifecycle(
+          (reactContext.currentActivity as AppCompatActivity),
+          cameraSelector,
+          analysisUseCase
+        )
+      } catch (exc: Exception) {
+        isCameraRunning = false
+      }
     }
   }
 }

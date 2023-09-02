@@ -31,7 +31,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
     val scannerView = ReactNativeScannerView(mCallerContext)
-    scannerView.setUpCamera(mCallerContext)
+    scannerView.setUpCamera()
     return scannerView
   }
 

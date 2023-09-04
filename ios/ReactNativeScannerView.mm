@@ -21,7 +21,7 @@ using namespace facebook::react;
     AVCaptureMetadataOutput *_output;
     AVCaptureVideoPreviewLayer *_prevLayer;
     
-    bool pauseAfterCapture;
+    BOOL pauseAfterCapture;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -73,7 +73,7 @@ using namespace facebook::react;
         return;
     }
     
-    if (pauseAfterCapture == true) {
+    if (pauseAfterCapture == YES) {
         [[_prevLayer connection] setEnabled:NO];
     }
     
@@ -159,7 +159,7 @@ using namespace facebook::react;
 }
 
 - (void)handleCommand:(nonnull const NSString *)commandName args:(nonnull const NSArray *)args {
-    
+    RCTReactNativeScannerViewHandleCommand(self, commandName, args);
 }
 
 - (void)pausePreview {

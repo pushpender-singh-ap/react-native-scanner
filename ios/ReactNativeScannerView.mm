@@ -10,7 +10,6 @@
 using namespace facebook::react;
 
 @interface ReactNativeScannerView () <RCTReactNativeScannerViewViewProtocol>
-@property Boolean pauseAfterCapture;
 @end
 
 @implementation ReactNativeScannerView {
@@ -21,6 +20,8 @@ using namespace facebook::react;
     AVCaptureDeviceInput *_input;
     AVCaptureMetadataOutput *_output;
     AVCaptureVideoPreviewLayer *_prevLayer;
+    
+    bool pauseAfterCapture;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -72,7 +73,7 @@ using namespace facebook::react;
         return;
     }
     
-    if (self.pauseAfterCapture == true) {
+    if (pauseAfterCapture == true) {
         [[_prevLayer connection] setEnabled:NO];
     }
     
@@ -146,18 +147,8 @@ using namespace facebook::react;
 {
     const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
     const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
-
-#define REMAP_WEBVIEW_PROP(name)                    \
-    if (oldViewProps.name != newViewProps.name) {   \
-        self.name = newViewProps.name;             \
-    }
-
-#define REMAP_WEBVIEW_STRING_PROP(name)                             \
-    if (oldViewProps.name != newViewProps.name) {                   \
-        self.name = RCTNSStringFromString(newViewProps.name);      \
-    }
-
-    REMAP_WEBVIEW_PROP(pauseAfterCapture)
+    
+    pauseAfterCapture = newViewProps.pauseAfterCapture;
     
     [super updateProps:props oldProps:oldProps];
 }

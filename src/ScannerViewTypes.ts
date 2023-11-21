@@ -48,5 +48,6 @@ export type ScannerViewQRScanEvent = NativeSyntheticEvent<ScannerViewQRScan>;
 
 export interface ScannerViewProps extends ViewProps {
   pauseAfterCapture?: boolean;
+  isActive?: boolean;
   onQrScanned?: (event: ScannerViewQRScanEvent) => void;
 }

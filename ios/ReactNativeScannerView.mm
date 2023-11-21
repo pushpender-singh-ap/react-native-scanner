@@ -22,6 +22,7 @@ using namespace facebook::react;
     AVCaptureVideoPreviewLayer *_prevLayer;
     
     BOOL pauseAfterCapture;
+    BOOL isActive;
 }
 
 + (NSArray *)metadataObjectTypes
@@ -50,12 +51,10 @@ using namespace facebook::react;
         _props = defaultProps;
         
         _view = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 500, 500)];
-        
-        
         _session = [[AVCaptureSession alloc] init];
         _device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-        NSError *error = nil;
         
+        NSError *error = nil;
         _input = [AVCaptureDeviceInput deviceInputWithDevice:_device error:&error];
         if (_input) {
             [_session addInput:_input];
@@ -70,7 +69,6 @@ using namespace facebook::react;
         _output.metadataObjectTypes = [ReactNativeScannerView metadataObjectTypes];
         
         _prevLayer = [AVCaptureVideoPreviewLayer layerWithSession:_session];
-        
         _prevLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
         [_view.layer addSublayer:_prevLayer];
         [_session startRunning];
@@ -163,12 +161,31 @@ using namespace facebook::react;
     return CGPointMake([[object objectForKey:@"X"] doubleValue], [[object objectForKey:@"Y"] doubleValue]);
 }
 
+- (void)checkIsActive {
+    if (isActive == _session.isRunning) {
+        return;
+    }
+
+    // Start/Stop session
+    if (isActive) {
+        [_session startRunning];
+    } else {
+        [captureSession stopRunning];
+    }
+  }
+
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
     const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
     const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
     
     pauseAfterCapture = newViewProps.pauseAfterCapture;
+
+    if (isActive != newViewProps.isActive) {
+        isActive = newViewProps.pauseAfterCapture;
+
+        [self checkIsActive];
+    }
     
     [super updateProps:props oldProps:oldProps];
 }

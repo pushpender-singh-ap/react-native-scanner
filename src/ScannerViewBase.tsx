@@ -7,6 +7,7 @@ import type { ScannerViewProps, ScannerViewQRScanEvent } from "./ScannerViewType
 
 const ScannerViewComponent = forwardRef<{}, ScannerViewProps>(({
   pauseAfterCapture = false,
+  isActive = false,
   onQrScanned: onQrScannedProp,
   ...otherProps
 }, ref) => {
@@ -27,6 +28,7 @@ const ScannerViewComponent = forwardRef<{}, ScannerViewProps>(({
     key="scannerViewKey"
     ref={scannerViewRef}
     pauseAfterCapture={pauseAfterCapture}
+    isActive={isActive}
     onQrScanned={onQrScanned}
   />
 

@@ -73,6 +73,11 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.setPauseAfterCapture(value)
   }
 
+  @ReactProp(name = "isActive")
+  override fun setIsActive(view: ReactNativeScannerView?, value: Boolean) {
+    view?.setIsActive(value)
+  }
+
   override fun pausePreview(view: ReactNativeScannerView?) {
     view?.pausePreview()
   }

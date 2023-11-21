@@ -21,6 +21,7 @@ type Event = Readonly<{
 
 export interface NativeProps extends ViewProps {
   pauseAfterCapture?: boolean,
+  isActive?: boolean,
   onQrScanned?: DirectEventHandler<Event>; // Event name should start with "on"
 }
 

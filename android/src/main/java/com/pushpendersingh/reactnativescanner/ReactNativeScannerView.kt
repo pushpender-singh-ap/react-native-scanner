@@ -39,6 +39,7 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
   private var isCameraRunning: Boolean = false
   private var pauseAfterCapture: Boolean = false
+  private var isActive: Boolean = false
 
   companion object {
     private val REQUIRED_PERMISSIONS =
@@ -226,6 +227,10 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
   fun setPauseAfterCapture(value: Boolean) {
     pauseAfterCapture = value
+  }
+
+  fun setIsActive(value: Boolean) {
+    isActive = value
   }
 
   fun pausePreview() {

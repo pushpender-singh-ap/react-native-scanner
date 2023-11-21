@@ -170,9 +170,9 @@ using namespace facebook::react;
     if (isActive) {
         [_session startRunning];
     } else {
-        [captureSession stopRunning];
+        [_session stopRunning];
     }
-  }
+}
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {

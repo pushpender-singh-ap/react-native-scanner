@@ -162,18 +162,23 @@ using namespace facebook::react;
 }
 
 - (void)setIsActive:(BOOL)active {
-    if (active == _session.isRunning) {
-        return;
-    }
-
-    // Start/Stop session
     isActive = active;
+
+    // Enable/Disable Preview Layer
     if (isActive) {
-        [_session startRunning];
         [self resumePreview];
     } else {
-        [_session stopRunning];
         [self pausePreview];
+    }
+
+    if (isActive == _session.isRunning) {
+        return;
+    }
+    // Start/Stop session
+    if (isActive) {
+        [_session startRunning];
+    } else {
+        [_session stopRunning];
     }
 }
 

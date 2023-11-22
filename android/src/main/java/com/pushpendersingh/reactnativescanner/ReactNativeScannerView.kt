@@ -225,6 +225,10 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     }, ContextCompat.getMainExecutor(context))
   }
 
+  private fun stopCamera() {
+
+  }
+
   fun setPauseAfterCapture(value: Boolean) {
     pauseAfterCapture = value
   }
@@ -258,5 +262,13 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         isCameraRunning = false
       }
     }
+  }
+
+  fun startScanning() { 
+    setIsActive(true)
+  }
+
+  fun stopScanning() { 
+    setIsActive(false)
   }
 }

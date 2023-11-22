@@ -89,15 +89,15 @@ using namespace facebook::react;
     NSArray *barCodeTypes = [ReactNativeScannerView metadataObjectTypes];
     
     for (AVMetadataObject *metadata in metadataObjects) {
-        BOOL isValidCode = false;
+        BOOL isValidCode = NO;
         for (NSString *type in barCodeTypes) {
             if ([metadata.type isEqualToString:type]) {
-                isValidCode = true;
+                isValidCode = YES;
                 break;
             }
         }
         
-        if (isValidCode == true) {
+        if (isValidCode == YES) {
             [validBarCodes addObject:metadata];
         }
     }
@@ -161,16 +161,19 @@ using namespace facebook::react;
     return CGPointMake([[object objectForKey:@"X"] doubleValue], [[object objectForKey:@"Y"] doubleValue]);
 }
 
-- (void)checkIsActive {
-    if (isActive == _session.isRunning) {
+- (void)setIsActive:(BOOL)active {
+    if (active == _session.isRunning) {
         return;
     }
 
     // Start/Stop session
+    isActive = active;
     if (isActive) {
         [_session startRunning];
+        [self resumePreview];
     } else {
         [_session stopRunning];
+        [self pausePreview];
     }
 }
 
@@ -180,12 +183,7 @@ using namespace facebook::react;
     const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
     
     pauseAfterCapture = newViewProps.pauseAfterCapture;
-
-    if (isActive != newViewProps.isActive) {
-        isActive = newViewProps.pauseAfterCapture;
-
-        [self checkIsActive];
-    }
+    [self setIsActive:newViewProps.isActive];
     
     [super updateProps:props oldProps:oldProps];
 }
@@ -209,6 +207,14 @@ using namespace facebook::react;
     if (![[_prevLayer connection] isEnabled]) {
         [[_prevLayer connection] setEnabled:YES];
     }
+}
+
+- (void)startScanning {
+    [self setIsActive:YES];
+}
+
+- (void)stopScanning {
+    [self setIsActive:NO];
 }
 
 @end

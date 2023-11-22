@@ -28,12 +28,16 @@ export interface NativeProps extends ViewProps {
 interface NativeCommands {
   pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+  startScanning: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+  stopScanning: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
 }
 
 export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
   supportedCommands: [
     'pausePreview',
-    'resumePreview'
+    'resumePreview',
+    'startScanning',
+    'stopScanning'
   ],
 });
 

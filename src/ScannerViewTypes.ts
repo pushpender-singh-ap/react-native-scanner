@@ -6,7 +6,9 @@ import {
 
 type ScannerViewCommands =
   | 'pausePreview'
-  | 'resumePreview';
+  | 'resumePreview'
+  | 'startScanning'
+  | 'stopScanning';
 
 interface RNScannerViewUIManager<Commands extends string> extends UIManagerStatic {
   getViewManagerConfig: (name: string) => {

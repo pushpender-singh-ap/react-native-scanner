@@ -17,6 +17,8 @@ const ScannerViewComponent = forwardRef<{}, ScannerViewProps>(({
   useImperativeHandle(ref, () => ({
     pausePreview: () => scannerViewRef.current && Commands.pausePreview(scannerViewRef.current),
     resumePreview: () => scannerViewRef.current && Commands.resumePreview(scannerViewRef.current),
+    startScanning: () => scannerViewRef.current && Commands.startScanning(scannerViewRef.current),
+    stopScanning: () => scannerViewRef.current && Commands.stopScanning(scannerViewRef.current),
   }), [scannerViewRef])
 
   const onQrScanned = useCallback((event: ScannerViewQRScanEvent) => {

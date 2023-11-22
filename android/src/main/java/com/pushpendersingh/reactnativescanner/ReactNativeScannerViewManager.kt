@@ -40,6 +40,8 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
     const val COMMAND_PAUSE_PREVIEW = 1
     const val COMMAND_RESUME_PREVIEW = 2
+    const val COMMAND_START_SCANNING = 3
+    const val COMMAND_STOP_SCANNING = 4
   }
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
@@ -53,6 +55,8 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     val map = mutableMapOf<String, Int>()
     map["pausePreview"] = COMMAND_PAUSE_PREVIEW
     map["resumePreview"] = COMMAND_RESUME_PREVIEW
+    map["startScanning"] = COMMAND_START_SCANNING
+    map["stopScanning"] = COMMAND_STOP_SCANNING
     return map
   }
 
@@ -60,6 +64,8 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     when (commandId) {
       "pausePreview" -> root.pausePreview()
       "resumePreview" -> root.resumePreview()
+      "startScanning" -> root.startScanning()
+      "stopScanning" -> root.stopScanning()
       else -> {
         println("Unsupported Command")
       }
@@ -84,5 +90,13 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   override fun resumePreview(view: ReactNativeScannerView?) {
     view?.resumePreview()
+  }
+
+  override fun startScanning(view: ReactNativeScannerView?) {
+    view?.startScanning()
+  }
+
+  override fun stopScanning(view: ReactNativeScannerView?) {
+    view?.stopScanning()
   }
 }

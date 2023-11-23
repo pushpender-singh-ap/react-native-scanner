@@ -21,6 +21,17 @@ const ScannerViewComponent = forwardRef<{}, ScannerViewProps>(({
     stopScanning: () => scannerViewRef.current && Commands.stopScanning(scannerViewRef.current),
   }), [scannerViewRef])
 
+  useEffect(() => {
+    const localRef = scannerViewRef.current;
+    return () => {
+      // Somehow when the Scanner Component unmounts, the Native Module is not deallocated and keeps on running in the background state
+      // So manually stopping the camera to avoid this situation.
+      if (localRef) {
+        Commands.stopScanning(localRef);
+      }
+    };
+  }, []);
+
   const onQrScanned = useCallback((event: ScannerViewQRScanEvent) => {
     onQrScannedProp?.(event);
   }, [onQrScannedProp]);

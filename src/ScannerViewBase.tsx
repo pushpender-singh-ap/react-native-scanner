@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useCallback, useImperativeHandle, useRef, useEffect } from 'react';
 import type { HostComponent } from 'react-native';
 
 import ReactNativeScannerView, { Commands } from './ReactNativeScannerViewNativeComponent';

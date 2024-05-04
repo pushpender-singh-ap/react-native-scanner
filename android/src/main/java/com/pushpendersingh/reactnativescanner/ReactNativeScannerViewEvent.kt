@@ -9,12 +9,12 @@ import com.facebook.react.uimanager.events.RCTModernEventEmitter
 class ReactNativeScannerViewEvent(viewId: Int, private val qrValue: String): Event<ReactNativeScannerViewEvent>(viewId) {
 
     override fun getEventName(): String {
-        return "topOnQrScanned"
+        return "onQrScanned"
     }
 
-    override fun dispatchModern(rctEventEmitter: RCTModernEventEmitter?) {
+    override fun dispatchModern(rctEventEmitter: RCTModernEventEmitter) {
         super.dispatchModern(rctEventEmitter) // if we don't call this, the react native part won't receive the event but because of this line event call two times
-        rctEventEmitter?.receiveEvent(
+        rctEventEmitter.receiveEvent(
             -1,
             viewTag, eventName,
             Arguments.createMap()

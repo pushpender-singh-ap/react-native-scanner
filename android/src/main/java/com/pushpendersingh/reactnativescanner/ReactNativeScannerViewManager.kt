@@ -39,7 +39,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
     return MapBuilder.of(
-      "topOnQrScanned",
+      "onQrScanned",
       MapBuilder.of("registrationName", "onQrScanned")
     )
   }

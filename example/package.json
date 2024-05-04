@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@pushpendersingh/react-native-scanner": "^1.1.0-beta.2",
+    "@pushpendersingh/react-native-scanner": "^1.1.0",
     "react": "18.2.0",
     "react-native": "0.72.3",
     "react-native-permissions": "^3.7.3"

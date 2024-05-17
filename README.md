@@ -8,6 +8,8 @@ With this package, users can quickly and easily scan barcodes and QR codes with 
 
 If you want to provide your React Native app the ability to read barcodes and QR codes, you should definitely give this package some thought.
 
+The `@pushpendersingh/react-native-scanner` package also includes a flashlight feature that can be turned on and off. This can be useful when scanning QR codes in low light conditions. Please note that this feature is currently only available on Android devices. (v1.2.0-beta.1)
+
 ## Getting started
 
 ### Requirements
@@ -20,11 +22,15 @@ Open your project's `Info.plist` and add the following lines inside the outermos
 <key>NSCameraUsageDescription</key>
 <string>Your message to user when the camera is accessed for the first time</string>
 ```
+
 Open your project's `Podfile` and add enable the new architecture:
+
 ```
 :fabric_enabled => true,
 ```
+
 Run below command to enable the new architecture in IOS folder
+
 ```
 bundle install && RCT_NEW_ARCH_ENABLED=1 bundle exec pod install
 ```
@@ -38,7 +44,9 @@ Open your project's `AndroidManifest.xml` and add the following lines inside the
 
 <uses-feature android:name="android.hardware.camera.any" />
 ```
+
 Open your project's `gradle.properties` and add enable the new architecture:
+
 ```
 newArchEnabled=true
 ```
@@ -62,6 +70,9 @@ npm install @pushpendersingh/react-native-scanner
 ## Usage
 
 To use @pushpendersingh/react-native-scanner, `import` the `@pushpendersingh/react-native-scanner` module and use the `<ReactNativeScannerView />` tag. More usage examples can be seen under the `examples/` folder.
+
+<details>
+  <summary>Basic usage</summary>
 
 Here is an example of basic usage:
 
@@ -129,6 +140,138 @@ export default function App() {
   }
 }
 ```
+</details>
+
+## Flashlight Feature (Android Only)
+
+<details>
+  <summary>Flashlight Feature (Android Only)</summary>
+
+  To use the flashlight feature, add the following code to your project:
+
+```jsx
+import React, {useEffect, useRef, useState} from 'react';
+import {
+  Alert,
+  Platform,
+  useWindowDimensions,
+  Text,
+  SafeAreaView,
+  TouchableOpacity,
+} from 'react-native';
+
+import {
+  request,
+  PERMISSIONS,
+  openSettings,
+  RESULTS,
+} from 'react-native-permissions';
+import {
+  ReactNativeScannerView,
+  Commands,
+} from '@pushpendersingh/react-native-scanner';
+
+export default function App() {
+  const {height, width} = useWindowDimensions();
+  const [isCameraPermissionGranted, setIsCameraPermissionGranted] =
+    useState(false);
+  const cameraRef = useRef(null);
+
+  useEffect(() => {
+    checkCameraPermission();
+
+    return () => {
+      Commands.releaseCamera(cameraRef.current);
+    };
+  }, []);
+
+  const enableFlashlight = () => {
+    Commands.enableFlashlight(cameraRef.current);
+  };
+
+  const disableFlashlight = () => {
+    Commands.disableFlashlight(cameraRef.current);
+  };
+
+  const checkCameraPermission = async () => {
+    request(
+      Platform.OS === 'ios'
+        ? PERMISSIONS.IOS.CAMERA
+        : PERMISSIONS.ANDROID.CAMERA,
+    ).then(async (result: any) => {
+      switch (result) {
+        case RESULTS.UNAVAILABLE:
+          break;
+        case RESULTS.DENIED:
+          Alert.alert(
+            'Permission Denied',
+            'You need to grant camera permission first',
+          );
+          openSettings();
+          break;
+        case RESULTS.GRANTED:
+          setIsCameraPermissionGranted(true);
+          break;
+        case RESULTS.BLOCKED:
+          Alert.alert(
+            'Permission Blocked',
+            'You need to grant camera permission first',
+          );
+          openSettings();
+          break;
+      }
+    });
+  };
+
+  if (isCameraPermissionGranted) {
+    return (
+      <SafeAreaView style={{flex: 1}}>
+        <ReactNativeScannerView
+          ref={ref => (cameraRef.current = ref)}
+          style={{height, width}}
+          onQrScanned={(value: any) => {
+            console.log(value.nativeEvent);
+          }}
+        />
+
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            left: 20,
+            padding: 10,
+            backgroundColor: 'blue',
+            borderRadius: 10,
+          }}
+          onPress={enableFlashlight}>
+          <Text>Turn ON</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            right: 20,
+            padding: 10,
+            backgroundColor: 'blue',
+            borderRadius: 10,
+          }}
+          onPress={disableFlashlight}>
+          <Text>Turn OFF</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  } else {
+    return (
+      <Text style={{fontSize: 30, color: 'red'}}>
+        You need to grant camera permission first
+      </Text>
+    );
+  }
+}
+```
+
+</details>
 
 ## Props
 

@@ -12,7 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: setup corepack
-        run: corepack use yarn@*
+        run: corepack use yarn@1.22.19
+        
+      - name: setup yarn
+        run: yarn set version 1.22.19
         
       - name: Checkout
         uses: actions/checkout@v3
@@ -30,7 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: setup corepack
-        run: corepack use yarn@*
+        run: corepack use yarn@1.22.19
+        
+      - name: setup yarn
+        run: yarn set version 1.22.19
         
       - name: Checkout
         uses: actions/checkout@v3
@@ -45,7 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: setup corepack
-        run: corepack use yarn@*
+        run: corepack use yarn@1.22.19
+        
+      - name: setup yarn
+        run: yarn set version 1.22.19
         
       - name: Checkout
         uses: actions/checkout@v3
@@ -62,7 +71,10 @@ jobs:
       TURBO_CACHE_DIR: .turbo/android
     steps:
       - name: setup corepack
-        run: corepack use yarn@*
+        run: corepack use yarn@1.22.19
+        
+      - name: setup yarn
+        run: yarn set version 1.22.19
         
       - name: Checkout
         uses: actions/checkout@v3
@@ -119,7 +131,10 @@ jobs:
       TURBO_CACHE_DIR: .turbo/ios
     steps:
       - name: setup corepack
-        run: corepack use yarn@*
+        run: corepack use yarn@1.22.19
+        
+      - name: setup yarn
+        run: yarn set version 1.22.19
         
       - name: Checkout
         uses: actions/checkout@v3

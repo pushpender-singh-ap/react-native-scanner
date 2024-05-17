@@ -4,6 +4,8 @@ description: Setup Node.js and install dependencies
 runs:
   using: composite
   steps:
+    - name: setup corepack
+      run: corepack use yarn@*
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:

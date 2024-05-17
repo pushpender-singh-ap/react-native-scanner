@@ -26,6 +26,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import androidx.camera.core.CameraControl
 
 class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
@@ -36,6 +37,7 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     private lateinit var scanner: BarcodeScanner
     private var analysisUseCase: ImageAnalysis = ImageAnalysis.Builder()
         .build()
+    private lateinit var cameraControl: CameraControl
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -196,10 +198,31 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
                     analysisUseCase
                 )
 
+                val camera = cameraProvider.bindToLifecycle(
+                    (reactApplicationContext.currentActivity as AppCompatActivity),
+                    cameraSelector,
+                    surfacePreview,
+                    analysisUseCase
+                )
+                cameraControl = camera.cameraControl
+
             } catch (exc: Exception) {
                 
             }
 
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    fun enableFlashlight() {
+        cameraControl.enableTorch(true)
+    }
+
+    fun disableFlashlight() {
+        cameraControl.enableTorch(false)
+    }
+
+    fun releaseCamera() {
+        cameraExecutor.shutdown()
+        mCameraProvider?.unbindAll()
     }
 }

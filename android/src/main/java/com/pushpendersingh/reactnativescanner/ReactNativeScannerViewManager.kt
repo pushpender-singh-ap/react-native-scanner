@@ -27,6 +27,18 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     return NAME
   }
 
+  override fun enableFlashlight(view: ReactNativeScannerView?) {
+    view?.enableFlashlight()
+  }
+
+  override fun disableFlashlight(view: ReactNativeScannerView?) {
+    view?.disableFlashlight()
+  }
+
+  override fun releaseCamera(view: ReactNativeScannerView?) {
+    view?.releaseCamera()
+  }
+
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
     val reactnativeScannerView = ReactNativeScannerView(mCallerContext)
     reactnativeScannerView.setUpCamera(mCallerContext)

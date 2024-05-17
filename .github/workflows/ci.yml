@@ -11,6 +11,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      - name: setup corepack
+        run: corepack use yarn@*
+        
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -26,6 +29,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: setup corepack
+        run: corepack use yarn@*
+        
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -38,6 +44,9 @@ jobs:
   build-library:
     runs-on: ubuntu-latest
     steps:
+      - name: setup corepack
+        run: corepack use yarn@*
+        
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -52,6 +61,9 @@ jobs:
     env:
       TURBO_CACHE_DIR: .turbo/android
     steps:
+      - name: setup corepack
+        run: corepack use yarn@*
+        
       - name: Checkout
         uses: actions/checkout@v3
 
@@ -106,6 +118,9 @@ jobs:
     env:
       TURBO_CACHE_DIR: .turbo/ios
     steps:
+      - name: setup corepack
+        run: corepack use yarn@*
+        
       - name: Checkout
         uses: actions/checkout@v3
 

@@ -8,7 +8,7 @@ With this package, users can quickly and easily scan barcodes and QR codes with 
 
 If you want to provide your React Native app the ability to read barcodes and QR codes, you should definitely give this package some thought.
 
-The `@pushpendersingh/react-native-scanner` package also includes a flashlight feature that can be turned on and off. This can be useful when scanning QR codes in low light conditions. Please note that this feature is currently only available on Android devices. (v1.2.0-beta.1)
+The `@pushpendersingh/react-native-scanner` package also includes a flashlight feature that can be turned on and off. This can be useful when scanning QR codes in low light conditions.
 
 ## Getting started
 
@@ -140,12 +140,13 @@ export default function App() {
   }
 }
 ```
+
 </details>
 
-## Flashlight Feature (Android Only)
+## Flashlight Feature
 
 <details>
-  <summary>Flashlight Feature (Android Only)</summary>
+  <summary>Flashlight Feature</summary>
 
   To use the flashlight feature, add the following code to your project:
 
@@ -181,7 +182,9 @@ export default function App() {
     checkCameraPermission();
 
     return () => {
-      Commands.releaseCamera(cameraRef.current);
+      if(cameraRef.current) {
+        Commands.releaseCamera(cameraRef.current);
+      }
     };
   }, []);
 
@@ -281,6 +284,40 @@ propType: `func.isRequired`
 default: `(e) => (console.log('QR code scanned!', e))`
 
 In the event that a QR code or barcode is detected in the camera's view, this specified method will be called.
+
+## Native Commands
+
+The `@pushpendersingh/react-native-scanner` package also includes a few native commands that can be used to control the camera and flashlight.
+
+### Commands
+
+#### `enableFlashlight`
+
+This command is used to turn on the flashlight.
+```js
+if(cameraRef.current) {
+  Commands.enableFlashlight(cameraRef.current);
+}
+```
+
+#### `disableFlashlight`
+
+This command is used to turn off the flashlight.
+```js
+if(cameraRef.current) {
+  Commands.disableFlashlight(cameraRef.current);
+}
+```
+
+#### `releaseCamera`
+
+This command is used to release the camera.
+
+```js
+if(cameraRef.current) {
+  Commands.releaseCamera(cameraRef.current);
+}
+```
 
 ## Contributing
 

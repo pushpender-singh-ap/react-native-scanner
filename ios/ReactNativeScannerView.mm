@@ -58,7 +58,14 @@ using namespace facebook::react;
 
     _prevLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
        [_view.layer addSublayer:_prevLayer];
-       [_session startRunning];
+    
+    // Create a dispatch queue.
+    dispatch_queue_t sessionQueue = dispatch_queue_create("session queue", DISPATCH_QUEUE_SERIAL);
+
+    // Use dispatch_async to call the startRunning method on the sessionQueue.
+    dispatch_async(sessionQueue, ^{
+        [self->_session startRunning];
+    });
 
     self.contentView = _view;
   }

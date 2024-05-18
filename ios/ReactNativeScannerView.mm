@@ -58,7 +58,7 @@ using namespace facebook::react;
 
     _prevLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
        [_view.layer addSublayer:_prevLayer];
-    
+      
     // Create a dispatch queue.
     dispatch_queue_t sessionQueue = dispatch_queue_create("session queue", DISPATCH_QUEUE_SERIAL);
 
@@ -101,6 +101,49 @@ using namespace facebook::react;
   }
 }
 
+- (void)releaseCamera {
+    
+    NSLog(@"%@", @"Release Camera");
+
+    if (_session != nil) {
+      // Stop the session
+      [_session stopRunning];
+
+      // Release the session, input, output, and preview layer
+      _session = nil;
+      _input = nil;
+      _output = nil;
+      _prevLayer = nil;
+        
+    }
+}
+
+- (void)enableFlashlight {
+    if ([_device hasTorch] && [_device isTorchModeSupported:AVCaptureTorchModeOn]) {
+        NSError *error = nil;
+        if ([_device lockForConfiguration:&error]) {
+            [_device setTorchMode:AVCaptureTorchModeOn];
+            [_device unlockForConfiguration];
+        } else {
+            // Handle error
+            NSLog(@"%@", [error localizedDescription]);
+        }
+    }
+}
+
+- (void)disableFlashlight {
+    if ([_device hasTorch] && [_device isTorchModeSupported:AVCaptureTorchModeOff]) {
+        NSError *error = nil;
+        if ([_device lockForConfiguration:&error]) {
+            [_device setTorchMode:AVCaptureTorchModeOff];
+            [_device unlockForConfiguration];
+        } else {
+            // Handle error
+            NSLog(@"%@", [error localizedDescription]);
+        }
+    }
+}
+
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
     [super updateProps:props oldProps:oldProps];
@@ -109,6 +152,10 @@ using namespace facebook::react;
 - (void)updateLayoutMetrics:(const facebook::react::LayoutMetrics &)layoutMetrics oldLayoutMetrics:(const facebook::react::LayoutMetrics &)oldLayoutMetrics{
   [super updateLayoutMetrics:layoutMetrics oldLayoutMetrics:oldLayoutMetrics];
   _prevLayer.frame = [_view.layer bounds];
+}
+
+- (void)handleCommand:(nonnull const NSString *)commandName args:(nonnull const NSArray *)args {
+    RCTReactNativeScannerViewHandleCommand(self, commandName, args);
 }
 
 @end

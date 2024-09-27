@@ -36,7 +36,8 @@ using namespace facebook::react;
              AVMetadataObjectTypeCode128Code,
              AVMetadataObjectTypePDF417Code,
              AVMetadataObjectTypeQRCode,
-             AVMetadataObjectTypeAztecCode];
+             AVMetadataObjectTypeAztecCode,
+             AVMetadataObjectTypeDataMatrixCode];
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider

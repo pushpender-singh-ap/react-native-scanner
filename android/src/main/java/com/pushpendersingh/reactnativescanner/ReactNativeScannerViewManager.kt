@@ -29,6 +29,18 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     return NAME
   }
 
+  override fun enableFlashlight(view: ReactNativeScannerView?) {
+    view?.enableFlashlight()
+  }
+
+  override fun disableFlashlight(view: ReactNativeScannerView?) {
+    view?.disableFlashlight()
+  }
+
+  override fun releaseCamera(view: ReactNativeScannerView?) {
+    view?.releaseCamera()
+  }
+
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
     val scannerView = ReactNativeScannerView(mCallerContext)
     scannerView.setUpCamera()
@@ -46,7 +58,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
     return MapBuilder.of(
-      "topOnQrScanned",
+      "onQrScanned",
       MapBuilder.of("registrationName", "onQrScanned")
     )
   }

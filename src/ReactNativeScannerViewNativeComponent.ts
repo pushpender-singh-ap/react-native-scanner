@@ -26,6 +26,9 @@ export interface NativeProps extends ViewProps {
 }
 
 interface NativeCommands {
+  enableFlashlight: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => Promise<void>;
+  disableFlashlight: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => Promise<void>;
+  releaseCamera: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => Promise<void>;
   pausePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   resumePreview: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   startScanning: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
@@ -34,6 +37,9 @@ interface NativeCommands {
 
 export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
   supportedCommands: [
+    'enableFlashlight',
+    'disableFlashlight',
+    'releaseCamera',
     'pausePreview',
     'resumePreview',
     'startScanning',

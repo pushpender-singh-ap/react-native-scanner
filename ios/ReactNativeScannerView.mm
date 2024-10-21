@@ -161,7 +161,7 @@ using namespace facebook::react;
     }
 }
 
-(void)releaseCamera {
+- (void)releaseCamera {
 
     NSLog(@"%@", @"Release Camera");
 

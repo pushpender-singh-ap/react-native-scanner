@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "ReactNativeScannerExample.app"
-               BlueprintName = "ReactNativeScannerExample"
-               ReferencedContainer = "container:ReactNativeScannerExample.xcodeproj">
+               BuildableName = "AwesomeProject.app"
+               BlueprintName = "AwesomeProject"
+               ReferencedContainer = "container:AwesomeProject.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "ReactNativeScannerExampleTests.xctest"
-               BlueprintName = "ReactNativeScannerExampleTests"
-               ReferencedContainer = "container:ReactNativeScannerExample.xcodeproj">
+               BuildableName = "AwesomeProjectTests.xctest"
+               BlueprintName = "AwesomeProjectTests"
+               ReferencedContainer = "container:AwesomeProject.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "ReactNativeScannerExample.app"
-            BlueprintName = "ReactNativeScannerExample"
-            ReferencedContainer = "container:ReactNativeScannerExample.xcodeproj">
+            BuildableName = "AwesomeProject.app"
+            BlueprintName = "AwesomeProject"
+            ReferencedContainer = "container:AwesomeProject.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "ReactNativeScannerExample.app"
-            BlueprintName = "ReactNativeScannerExample"
-            ReferencedContainer = "container:ReactNativeScannerExample.xcodeproj">
+            BuildableName = "AwesomeProject.app"
+            BlueprintName = "AwesomeProject"
+            ReferencedContainer = "container:AwesomeProject.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

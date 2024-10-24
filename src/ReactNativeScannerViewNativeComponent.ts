@@ -7,23 +7,16 @@ import type {
 } from 'react-native/Libraries/Types/CodegenTypes';
 import codegenNativeCommands from 'react-native/Libraries/Utilities/codegenNativeCommands';
 
-type Point = Readonly<{
-  x: Double;
-  y: Double;
-}>;
-
-type Origin = Readonly<{
-  topLeft: Readonly<Point>;
-  bottomLeft: Readonly<Point>;
-  bottomRight: Readonly<Point>;
-  topRight: Readonly<Point>;
-}>;
-
 type Event = Readonly<{
   bounds: Readonly<{
     width: Double;
     height: Double;
-    origin: Readonly<Origin>;
+    origin: Readonly<{
+      topLeft: Readonly<{ x: Double; y: Double }>;
+      bottomLeft: Readonly<{ x: Double; y: Double }>;
+      bottomRight: Readonly<{ x: Double; y: Double }>;
+      topRight: Readonly<{ x: Double; y: Double }>;
+    }>;
   }>;
   type: string;
   data: string;

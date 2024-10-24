@@ -200,10 +200,10 @@ using namespace facebook::react;
       [_session stopRunning];
 
       // Release the session, input, output, and preview layer
-      _session = nil;
-      _input = nil;
-      _output = nil;
-      _prevLayer = nil;
+//      _session = nil;
+//      _input = nil;
+//      _output = nil;
+//      _prevLayer = nil;
         
     }
 }

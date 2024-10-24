@@ -234,26 +234,6 @@ using namespace facebook::react;
     }
 }
 
-- (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
-{
-    const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
-    const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
-    
-    pauseAfterCapture = newViewProps.pauseAfterCapture;
-    [self setIsActive:newViewProps.isActive];
-    
-    [super updateProps:props oldProps:oldProps];
-}
-
-- (void)updateLayoutMetrics:(const facebook::react::LayoutMetrics &)layoutMetrics oldLayoutMetrics:(const facebook::react::LayoutMetrics &)oldLayoutMetrics{
-    [super updateLayoutMetrics:layoutMetrics oldLayoutMetrics:oldLayoutMetrics];
-    _prevLayer.frame = [_view.layer bounds];
-}
-
-- (void)handleCommand:(nonnull const NSString *)commandName args:(nonnull const NSArray *)args {
-    RCTReactNativeScannerViewHandleCommand(self, commandName, args);
-}
-
 - (void)pausePreview {
     if ([[_prevLayer connection] isEnabled]) {
         [[_prevLayer connection] setEnabled:NO];
@@ -272,6 +252,26 @@ using namespace facebook::react;
 
 - (void)stopScanning {
     [self setIsActive:NO];
+}
+
+- (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
+{
+    const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
+    const auto &newViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(props);
+    
+    pauseAfterCapture = newViewProps.pauseAfterCapture;
+    [self setIsActive:newViewProps.isActive];
+    
+    [super updateProps:props oldProps:oldProps];
+}
+
+- (void)updateLayoutMetrics:(const facebook::react::LayoutMetrics &)layoutMetrics oldLayoutMetrics:(const facebook::react::LayoutMetrics &)oldLayoutMetrics{
+    [super updateLayoutMetrics:layoutMetrics oldLayoutMetrics:oldLayoutMetrics];
+    _prevLayer.frame = [_view.layer bounds];
+}
+
+- (void)handleCommand:(nonnull const NSString *)commandName args:(nonnull const NSArray *)args {
+    RCTReactNativeScannerViewHandleCommand(self, commandName, args);
 }
 
 @end

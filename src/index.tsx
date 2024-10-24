@@ -1,4 +1,2 @@
-import ReactNativeScannerView from './ScannerView';
-
-export { ReactNativeScannerView };
-export default ReactNativeScannerView;
+export { default as ReactNativeScannerView } from './ReactNativeScannerViewNativeComponent';
+export * from './ReactNativeScannerViewNativeComponent';

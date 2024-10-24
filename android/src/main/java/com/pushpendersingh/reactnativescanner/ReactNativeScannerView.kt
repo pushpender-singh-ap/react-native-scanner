@@ -273,12 +273,4 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
             }
         }
     }
-
-    fun startScanning() {
-        setIsActive(true)
-    }
-
-    fun stopScanning() {
-        setIsActive(false)
-    }
 }

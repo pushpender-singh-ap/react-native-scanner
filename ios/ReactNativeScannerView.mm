@@ -246,14 +246,6 @@ using namespace facebook::react;
     }
 }
 
-- (void)startScanning {
-    [self setIsActive:YES];
-}
-
-- (void)stopScanning {
-    [self setIsActive:NO];
-}
-
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
     const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);

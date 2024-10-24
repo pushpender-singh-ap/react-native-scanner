@@ -23,7 +23,7 @@ type Event = Readonly<{
   bounds: Readonly<{
     width: Double;
     height: Double;
-    origin: Origin;
+    origin: Readonly<Origin>;
   }>;
   type: string;
   data: string;

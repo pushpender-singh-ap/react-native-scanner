@@ -143,25 +143,25 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
             barcodeScanner.process(inputImage)
                 .addOnSuccessListener { barcodeList ->
-                  if (barcodeList.isNotEmpty()) {
-                    if (pauseAfterCapture) {
-                      pausePreview()
-                    }
+                    if (barcodeList.isNotEmpty()) {
+                        if (pauseAfterCapture) {
+                            pausePreview()
+                        }
 
-                    val surfaceId = UIManagerHelper.getSurfaceId(reactApplicationContext)
-                    val eventDispatcher: EventDispatcher? = UIManagerHelper.getEventDispatcherForReactTag(reactApplicationContext, id)
+                        val surfaceId = UIManagerHelper.getSurfaceId(reactApplicationContext)
+                        val reactContext = context as ReactContext
+                        val eventDispatcher: EventDispatcher? = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
 
-                    barcodeList.forEach { barcode ->
-                      barcode?.let { code ->
-                        eventDispatcher?.dispatchEvent(code.cornerPoints?.let { cornerPoints ->
-                          code.boundingBox?.let { bounds ->
-                            ReactNativeScannerViewEvent(surfaceId, id, code.rawValue
-                              ?: "", bounds, cornerPoints, code.format)
-                          }
-                        })
-                      }
+                        barcodeList.forEach { barcode ->
+                            barcode?.let { code ->
+                                code.cornerPoints?.let { cornerPoints ->
+                                    code.boundingBox?.let { bounds ->
+                                        eventDispatcher?.dispatchEvent(ReactNativeScannerViewEvent(surfaceId, id, code.rawValue?: "", bounds, cornerPoints, code.format))
+                                    }
+                                }
+                            }
+                        }
                     }
-                  }
                 }
                 .addOnFailureListener {
                     // This failure will happen if the barcode scanning model

@@ -1,8 +1,6 @@
 package com.pushpendersingh.reactnativescanner
 
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReadableArray
-import com.facebook.react.common.MapBuilder
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
@@ -67,34 +65,5 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   companion object {
     const val NAME = "ReactNativeScannerView"
-
-    const val COMMAND_PAUSE_PREVIEW = 1
-    const val COMMAND_RESUME_PREVIEW = 2
-  }
-
-  override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
-    return MapBuilder.of(
-      "topOnQrScanned",
-      MapBuilder.of("registrationName", "onQrScanned")
-    )
-  }
-
-  override fun getCommandsMap(): MutableMap<String, Int> {
-    val map = mutableMapOf<String, Int>()
-    map["pausePreview"] = COMMAND_PAUSE_PREVIEW
-    map["resumePreview"] = COMMAND_RESUME_PREVIEW
-    return map
-  }
-
-  override fun receiveCommand(root: ReactNativeScannerView, commandId: String?, args: ReadableArray?) {
-    when (commandId) {
-      "pausePreview" -> root.pausePreview()
-      "resumePreview" -> root.resumePreview()
-      else -> {
-        println("Unsupported Command")
-      }
-    }
-
-    super.receiveCommand(root, commandId, args)
   }
 }

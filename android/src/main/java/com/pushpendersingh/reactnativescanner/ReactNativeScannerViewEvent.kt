@@ -6,7 +6,6 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.events.Event
-import com.facebook.react.uimanager.events.RCTModernEventEmitter
 import com.google.mlkit.vision.barcode.common.Barcode
 
 class ReactNativeScannerViewEvent(
@@ -20,15 +19,6 @@ class ReactNativeScannerViewEvent(
 
     override fun getEventName(): String {
         return "onQrScanned"
-    }
-
-    override fun dispatchModern(rctEventEmitter: RCTModernEventEmitter) {
-        super.dispatchModern(rctEventEmitter) // if we don't call this, the react native part won't receive the event but because of this line event call two times
-        rctEventEmitter.receiveEvent(
-            -1,
-            viewTag, eventName,
-            Arguments.createMap()
-        )
     }
 
     override fun getEventData(): WritableMap {

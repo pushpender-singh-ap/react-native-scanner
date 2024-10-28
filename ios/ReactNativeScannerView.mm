@@ -72,8 +72,16 @@ using namespace facebook::react;
         _prevLayer = [AVCaptureVideoPreviewLayer layerWithSession:_session];
         _prevLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
         [_view.layer addSublayer:_prevLayer];
-        [_session startRunning];
         
+        
+        // Create a dispatch queue.
+        dispatch_queue_t sessionQueue = dispatch_queue_create("session queue", DISPATCH_QUEUE_SERIAL);
+
+        // Use dispatch_async to call the startRunning method on the sessionQueue.
+        dispatch_async(sessionQueue, ^{
+            [self->_session startRunning];
+        });
+
         self.contentView = _view;
     }
     
@@ -183,6 +191,61 @@ using namespace facebook::react;
     }
 }
 
+- (void)releaseCamera {
+    
+    NSLog(@"%@", @"Release Camera");
+
+    if (_session != nil) {
+      // Stop the session
+      [_session stopRunning];
+
+      // Release the session, input, output, and preview layer
+//      _session = nil;
+//      _input = nil;
+//      _output = nil;
+//      _prevLayer = nil;
+        
+    }
+}
+
+- (void)enableFlashlight {
+    if ([_device hasTorch] && [_device isTorchModeSupported:AVCaptureTorchModeOn]) {
+        NSError *error = nil;
+        if ([_device lockForConfiguration:&error]) {
+            [_device setTorchMode:AVCaptureTorchModeOn];
+            [_device unlockForConfiguration];
+        } else {
+            // Handle error
+            NSLog(@"%@", [error localizedDescription]);
+        }
+    }
+}
+
+- (void)disableFlashlight {
+    if ([_device hasTorch] && [_device isTorchModeSupported:AVCaptureTorchModeOff]) {
+        NSError *error = nil;
+        if ([_device lockForConfiguration:&error]) {
+            [_device setTorchMode:AVCaptureTorchModeOff];
+            [_device unlockForConfiguration];
+        } else {
+            // Handle error
+            NSLog(@"%@", [error localizedDescription]);
+        }
+    }
+}
+
+- (void)pausePreview {
+    if ([[_prevLayer connection] isEnabled]) {
+        [[_prevLayer connection] setEnabled:NO];
+    }
+}
+
+- (void)resumePreview {
+    if (![[_prevLayer connection] isEnabled]) {
+        [[_prevLayer connection] setEnabled:YES];
+    }
+}
+
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
 {
     const auto &oldViewProps = *std::static_pointer_cast<ReactNativeScannerViewProps const>(_props);
@@ -203,30 +266,9 @@ using namespace facebook::react;
     RCTReactNativeScannerViewHandleCommand(self, commandName, args);
 }
 
-- (void)pausePreview {
-    if ([[_prevLayer connection] isEnabled]) {
-        [[_prevLayer connection] setEnabled:NO];
-    }
-}
-
-- (void)resumePreview {
-    if (![[_prevLayer connection] isEnabled]) {
-        [[_prevLayer connection] setEnabled:YES];
-    }
-}
-
-- (void)startScanning {
-    [self setIsActive:YES];
-}
-
-- (void)stopScanning {
-    [self setIsActive:NO];
-}
-
 @end
 
 Class<RCTComponentViewProtocol> ReactNativeScannerViewCls(void)
 {
     return ReactNativeScannerView.class;
 }
-

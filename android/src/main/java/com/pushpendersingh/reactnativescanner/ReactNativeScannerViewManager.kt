@@ -1,15 +1,13 @@
 package com.pushpendersingh.reactnativescanner
 
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReadableArray
-import com.facebook.react.common.MapBuilder
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewManagerDelegate
 import com.facebook.react.uimanager.annotations.ReactProp
-import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerDelegate
 import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerInterface
+import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerDelegate
 
 @ReactModule(name = ReactNativeScannerViewManager.NAME)
 class ReactNativeScannerViewManager(private val mCallerContext: ReactApplicationContext) :
@@ -21,57 +19,12 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     mDelegate = ReactNativeScannerViewManagerDelegate(this)
   }
 
-  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView> {
+  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView>? {
     return mDelegate
   }
 
   override fun getName(): String {
     return NAME
-  }
-
-  override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
-    val scannerView = ReactNativeScannerView(mCallerContext)
-    scannerView.setUpCamera()
-    return scannerView
-  }
-
-  companion object {
-    const val NAME = "ReactNativeScannerView"
-
-    const val COMMAND_PAUSE_PREVIEW = 1
-    const val COMMAND_RESUME_PREVIEW = 2
-    const val COMMAND_START_SCANNING = 3
-    const val COMMAND_STOP_SCANNING = 4
-  }
-
-  override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
-    return MapBuilder.of(
-      "topOnQrScanned",
-      MapBuilder.of("registrationName", "onQrScanned")
-    )
-  }
-
-  override fun getCommandsMap(): MutableMap<String, Int> {
-    val map = mutableMapOf<String, Int>()
-    map["pausePreview"] = COMMAND_PAUSE_PREVIEW
-    map["resumePreview"] = COMMAND_RESUME_PREVIEW
-    map["startScanning"] = COMMAND_START_SCANNING
-    map["stopScanning"] = COMMAND_STOP_SCANNING
-    return map
-  }
-
-  override fun receiveCommand(root: ReactNativeScannerView, commandId: String?, args: ReadableArray?) {
-    when (commandId) {
-      "pausePreview" -> root.pausePreview()
-      "resumePreview" -> root.resumePreview()
-      "startScanning" -> root.startScanning()
-      "stopScanning" -> root.stopScanning()
-      else -> {
-        println("Unsupported Command")
-      }
-    }
-
-    super.receiveCommand(root, commandId, args)
   }
 
   @ReactProp(name = "pauseAfterCapture")
@@ -84,6 +37,18 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.setIsActive(value)
   }
 
+  override fun enableFlashlight(view: ReactNativeScannerView?) {
+    view?.enableFlashlight()
+  }
+
+  override fun disableFlashlight(view: ReactNativeScannerView?) {
+    view?.disableFlashlight()
+  }
+
+  override fun releaseCamera(view: ReactNativeScannerView?) {
+    view?.releaseCamera()
+  }
+
   override fun pausePreview(view: ReactNativeScannerView?) {
     view?.pausePreview()
   }
@@ -92,11 +57,13 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.resumePreview()
   }
 
-  override fun startScanning(view: ReactNativeScannerView?) {
-    view?.startScanning()
+  override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
+    val reactnativeScannerView = ReactNativeScannerView(mCallerContext)
+    reactnativeScannerView.setUpCamera(mCallerContext)
+    return reactnativeScannerView
   }
 
-  override fun stopScanning(view: ReactNativeScannerView?) {
-    view?.stopScanning()
+  companion object {
+    const val NAME = "ReactNativeScannerView"
   }
 }

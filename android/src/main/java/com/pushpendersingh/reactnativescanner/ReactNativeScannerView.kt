@@ -39,8 +39,11 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         .build()
     private lateinit var cameraControl: CameraControl
 
+    private var isCameraRunning: Boolean = false
+    private var pauseAfterCapture: Boolean = false
+    private var isActive: Boolean = false
+
     companion object {
-        private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
             mutableListOf(
                 Manifest.permission.CAMERA
@@ -117,14 +120,15 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
             // newSingleThreadExecutor() will let us perform analysis on a single worker thread
             Executors.newSingleThreadExecutor()
         ) { imageProxy ->
-            processImageProxy(scanner, imageProxy)
+            processImageProxy(scanner, imageProxy, reactApplicationContext)
         }
     }
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun processImageProxy(
         barcodeScanner: BarcodeScanner,
-        imageProxy: ImageProxy
+        imageProxy: ImageProxy,
+        reactApplicationContext: ReactApplicationContext
     ) {
         imageProxy.image?.let { image ->
             val inputImage =
@@ -133,19 +137,30 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
                     imageProxy.imageInfo.rotationDegrees
                 )
 
+            if (!isCameraRunning) {
+                return;
+            }
+
             barcodeScanner.process(inputImage)
                 .addOnSuccessListener { barcodeList ->
-                    val barcode =
-                        barcodeList.getOrNull(0)        // `rawValue` is the decoded value of the barcode
-                    
-                    barcode?.rawValue?.let { value ->
-                        // mCameraProvider?.unbindAll() // this line will stop the camera from scanning after the first scan
+                    if (barcodeList.isNotEmpty()) {
+                        if (pauseAfterCapture) {
+                            pausePreview()
+                        }
+
+                        val surfaceId = UIManagerHelper.getSurfaceId(reactApplicationContext)
                         val reactContext = context as ReactContext
-                        val eventDispatcher: EventDispatcher? =
-                            UIManagerHelper.getEventDispatcherForReactTag(
-                                reactContext, id
-                            )
-                        eventDispatcher?.dispatchEvent(ReactNativeScannerViewEvent(id, value))
+                        val eventDispatcher: EventDispatcher? = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
+
+                        barcodeList.forEach { barcode ->
+                            barcode?.let { code ->
+                                code.cornerPoints?.let { cornerPoints ->
+                                    code.boundingBox?.let { bounds ->
+                                        eventDispatcher?.dispatchEvent(ReactNativeScannerViewEvent(surfaceId, id, code.rawValue?: "", bounds, cornerPoints, code.format))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 .addOnFailureListener {
@@ -186,18 +201,13 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
+            isCameraRunning = true
+
             try {
                 // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
 
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
-                    (reactApplicationContext.currentActivity as AppCompatActivity),
-                    cameraSelector,
-                    surfacePreview,
-                    analysisUseCase
-                )
-
                 val camera = cameraProvider.bindToLifecycle(
                     (reactApplicationContext.currentActivity as AppCompatActivity),
                     cameraSelector,
@@ -207,9 +217,8 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
                 cameraControl = camera.cameraControl
 
             } catch (exc: Exception) {
-                
+                isCameraRunning = false
             }
-
         }, ContextCompat.getMainExecutor(context))
     }
 
@@ -224,5 +233,44 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
     fun releaseCamera() {
         cameraExecutor.shutdown()
         mCameraProvider?.unbindAll()
+    }
+
+    private fun stopCamera() {
+
+    }
+
+    fun setPauseAfterCapture(value: Boolean) {
+        pauseAfterCapture = value
+    }
+
+    fun setIsActive(value: Boolean) {
+        isActive = value
+    }
+
+    fun pausePreview() {
+        if (isCameraRunning) {
+            isCameraRunning = false
+            mCameraProvider?.unbind(analysisUseCase)
+        }
+    }
+
+    fun resumePreview() {
+        if (!isCameraRunning) {
+            isCameraRunning = true
+
+            try {
+                val reactContext = context as ReactContext
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                // Bind use cases to camera
+                mCameraProvider?.bindToLifecycle(
+                    (reactContext.currentActivity as AppCompatActivity),
+                    cameraSelector,
+                    analysisUseCase
+                )
+            } catch (exc: Exception) {
+                isCameraRunning = false
+            }
+        }
     }
 }

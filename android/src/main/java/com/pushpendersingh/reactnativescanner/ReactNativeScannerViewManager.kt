@@ -1,11 +1,11 @@
 package com.pushpendersingh.reactnativescanner
 
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.common.MapBuilder
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewManagerDelegate
+import com.facebook.react.uimanager.annotations.ReactProp
 import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerInterface
 import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerDelegate
 
@@ -27,6 +27,16 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     return NAME
   }
 
+  @ReactProp(name = "pauseAfterCapture")
+  override fun setPauseAfterCapture(view: ReactNativeScannerView?, value: Boolean) {
+    view?.setPauseAfterCapture(value)
+  }
+
+  @ReactProp(name = "isActive")
+  override fun setIsActive(view: ReactNativeScannerView?, value: Boolean) {
+    view?.setIsActive(value)
+  }
+
   override fun enableFlashlight(view: ReactNativeScannerView?) {
     view?.enableFlashlight()
   }
@@ -39,6 +49,14 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.releaseCamera()
   }
 
+  override fun pausePreview(view: ReactNativeScannerView?) {
+    view?.pausePreview()
+  }
+
+  override fun resumePreview(view: ReactNativeScannerView?) {
+    view?.resumePreview()
+  }
+
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {
     val reactnativeScannerView = ReactNativeScannerView(mCallerContext)
     reactnativeScannerView.setUpCamera(mCallerContext)
@@ -47,12 +65,5 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
 
   companion object {
     const val NAME = "ReactNativeScannerView"
-  }
-
-  override fun getExportedCustomDirectEventTypeConstants(): Map<String?, Any> {
-    return MapBuilder.of(
-      "onQrScanned",
-      MapBuilder.of("registrationName", "onQrScanned")
-    )
   }
 }

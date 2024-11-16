@@ -11,5 +11,7 @@
 RCT_EXPORT_MODULE(ReactNativeScannerView)
 
 RCT_EXPORT_VIEW_PROPERTY(onQrScanned, RCTDirectEventBlock)
+RCT_EXPORT_VIEW_PROPERTY(pauseAfterCapture, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(isActive, BOOL)
 
 @end

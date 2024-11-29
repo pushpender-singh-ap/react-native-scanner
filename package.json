@@ -1,6 +1,6 @@
 {
   "name": "@pushpendersingh/react-native-scanner",
-  "version": "1.3.0-beta.2",
+  "version": "1.3.0",
   "description": "A QR code & Barcode Scanner for React Native Projects.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -43,7 +43,10 @@
     "ios",
     "android"
   ],
-  "repository": "https://github.com/pushpender-singh-ap/react-native-scanner",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pushpender-singh-ap/react-native-scanner.git"
+  },
   "author": "Pushpender Singh <pushpendersingh694@gmail.com> (https://github.com/pushpender-singh-ap)",
   "license": "MIT",
   "bugs": {

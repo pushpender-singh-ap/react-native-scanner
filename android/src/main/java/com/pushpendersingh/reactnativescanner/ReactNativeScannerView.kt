@@ -41,7 +41,7 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
 
     private var isCameraRunning: Boolean = false
     private var pauseAfterCapture: Boolean = false
-    private var isActive: Boolean = false
+    private var isActive: Boolean = true
 
     companion object {
         private val REQUIRED_PERMISSIONS =
@@ -145,7 +145,7 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
                 .addOnSuccessListener { barcodeList ->
                     if (barcodeList.isNotEmpty()) {
                         if (pauseAfterCapture) {
-                            pausePreview()
+                            pauseScanning()
                         }
 
                         val surfaceId = UIManagerHelper.getSurfaceId(reactApplicationContext)
@@ -247,14 +247,14 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         isActive = value
     }
 
-    fun pausePreview() {
+    fun pauseScanning() {
         if (isCameraRunning) {
             isCameraRunning = false
             mCameraProvider?.unbind(analysisUseCase)
         }
     }
 
-    fun resumePreview() {
+    fun resumeScanning() {
         if (!isCameraRunning) {
             isCameraRunning = true
 

@@ -49,12 +49,12 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.releaseCamera()
   }
 
-  override fun pausePreview(view: ReactNativeScannerView?) {
-    view?.pausePreview()
+  override fun pauseScanning(view: ReactNativeScannerView?) {
+    view?.pauseScanning()
   }
 
-  override fun resumePreview(view: ReactNativeScannerView?) {
-    view?.resumePreview()
+  override fun resumeScanning(view: ReactNativeScannerView?) {
+    view?.resumeScanning()
   }
 
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {

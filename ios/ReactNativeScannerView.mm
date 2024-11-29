@@ -21,8 +21,8 @@ using namespace facebook::react;
     AVCaptureMetadataOutput *_output;
     AVCaptureVideoPreviewLayer *_prevLayer;
     
-    BOOL pauseAfterCapture;
-    BOOL isActive;
+    BOOL pauseAfterCapture = NO; // Pause after capturing a barcode / or or not (default: NO)
+    BOOL isActive = YES; // Start the camera when the component is mounted (default: YES)
 }
 
 + (NSArray *)metadataObjectTypes
@@ -113,9 +113,9 @@ using namespace facebook::react;
     
     // pauseAfterCapture:
     // * Pause AVCaptureSession for further processing, after valid barcodes found,
-    // * Can be resumed back by calling resumePreview from the owner of the component
+    // * Can be resumed back by calling resumeScanning from the owner of the component
     if (pauseAfterCapture == YES && validBarCodes.count > 0) {
-        [self pausePreview];
+        [self pauseScanning];
     }
     
     for (AVMetadataObject *metadata in validBarCodes) {
@@ -175,9 +175,9 @@ using namespace facebook::react;
 
     // Enable/Disable Preview Layer
     if (isActive) {
-        [self resumePreview];
+        [self resumeScanning];
     } else {
-        [self pausePreview];
+        [self pauseScanning];
     }
 
     if (isActive == _session.isRunning) {
@@ -198,13 +198,6 @@ using namespace facebook::react;
     if (_session != nil) {
       // Stop the session
       [_session stopRunning];
-
-      // Release the session, input, output, and preview layer
-//      _session = nil;
-//      _input = nil;
-//      _output = nil;
-//      _prevLayer = nil;
-        
     }
 }
 
@@ -234,13 +227,13 @@ using namespace facebook::react;
     }
 }
 
-- (void)pausePreview {
+- (void)pauseScanning {
     if ([[_prevLayer connection] isEnabled]) {
         [[_prevLayer connection] setEnabled:NO];
     }
 }
 
-- (void)resumePreview {
+- (void)resumeScanning {
     if (![[_prevLayer connection] isEnabled]) {
         [[_prevLayer connection] setEnabled:YES];
     }

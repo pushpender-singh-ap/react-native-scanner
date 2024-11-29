@@ -8,7 +8,7 @@ With this package, users can quickly and easily scan barcodes and QR codes with 
 
 If you want to provide your React Native app the ability to read barcodes and QR codes, you should definitely give this package some thought.
 
-The `@pushpendersingh/react-native-scanner` package also includes a flashlight feature that can be turned on and off. This can be useful when scanning QR codes in low light conditions.
+The `@pushpendersingh/react-native-scanner` package also includes a flashlight feature that can be turned on and off. This can be useful when scanning QR codes & barcodes in low light conditions.
 
 ## Getting started
 
@@ -77,68 +77,162 @@ To use @pushpendersingh/react-native-scanner, `import` the `@pushpendersingh/rea
 Here is an example of basic usage:
 
 ```js
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Alert,
   Platform,
-  useWindowDimensions,
   Text,
-  SafeAreaView
+  SafeAreaView,
+  Button,
+  View,
+  StyleSheet,
 } from 'react-native';
 
-import { request, PERMISSIONS, openSettings, RESULTS } from 'react-native-permissions';
-import { ReactNativeScannerView } from "@pushpendersingh/react-native-scanner";
+import {
+  request,
+  PERMISSIONS,
+  openSettings,
+  RESULTS,
+} from 'react-native-permissions'; // For camera permission
+import {
+  Commands,
+  ReactNativeScannerView,
+} from '@pushpendersingh/react-native-scanner';
 
 export default function App() {
-
-  const { height, width } = useWindowDimensions();
-  const [isCameraPermissionGranted, setIsCameraPermissionGranted] = useState(false);
+  const scannerRef = useRef(null);
+  const [isCameraPermissionGranted, setIsCameraPermissionGranted] =
+    useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [scannedData, setScannedData] = useState(null);
 
   useEffect(() => {
     checkCameraPermission();
   }, []);
 
+  const handleBarcodeScanned = event => {
+    const {data, bounds, type} = event?.nativeEvent;
+    setScannedData({data, bounds, type});
+    console.log('Barcode scanned:', data, bounds, type);
+  };
+
+  // Pause the camera after barcode / QR code is scanned
+  const pauseScanning = () => {
+    if (scannerRef?.current) {
+      Commands.pauseScanning(scannerRef?.current);
+      console.log('Camera preview paused');
+    }
+  };
+
+  // Resume the camera after barcode / QR code is scanned
+  const resumeScanning = () => {
+    if (scannerRef?.current) {
+      Commands.resumeScanning(scannerRef?.current);
+      console.log('Camera preview resumed');
+    }
+  };
+
   const checkCameraPermission = async () => {
-    request(Platform.OS === 'ios' ? PERMISSIONS.IOS.CAMERA : PERMISSIONS.ANDROID.CAMERA)
-      .then(async (result: any) => {
-        switch (result) {
-          case RESULTS.UNAVAILABLE:
-            // console.log('This feature is not available (on this device / in this context)');
-            break;
-          case RESULTS.DENIED:
-            Alert.alert("Permission Denied", "You need to grant camera permission first");
-            openSettings();
-            break;
-          case RESULTS.GRANTED:
-            setIsCameraPermissionGranted(true);
-            break;
-          case RESULTS.BLOCKED:
-            Alert.alert("Permission Blocked", "You need to grant camera permission first");
-            openSettings();
-            break;
-        }
-      })
+    request(
+      Platform.OS === 'ios'
+        ? PERMISSIONS.IOS.CAMERA
+        : PERMISSIONS.ANDROID.CAMERA,
+    ).then(async (result: any) => {
+      switch (result) {
+        case RESULTS.UNAVAILABLE:
+          // console.log('This feature is not available (on this device / in this context)');
+          break;
+        case RESULTS.DENIED:
+          Alert.alert(
+            'Permission Denied',
+            'You need to grant camera permission first',
+          );
+          openSettings();
+          break;
+        case RESULTS.GRANTED:
+          setIsCameraPermissionGranted(true);
+          break;
+        case RESULTS.BLOCKED:
+          Alert.alert(
+            'Permission Blocked',
+            'You need to grant camera permission first',
+          );
+          openSettings();
+          break;
+      }
+    });
   };
 
   if (isCameraPermissionGranted) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <ReactNativeScannerView
-          style={{ height, width }}
-          onQrScanned={(value: any) => {
-            console.log(value.nativeEvent);
-          }}
-        />
+      <SafeAreaView style={{flex: 1}}>
+        {isActive && (
+          <ReactNativeScannerView
+            ref={scannerRef}
+            style={styles.scanner}
+            onQrScanned={handleBarcodeScanned}
+            pauseAfterCapture={false} // Pause the scanner after barcode / QR code is scanned
+            isActive={isActive} // Start / stop the scanner using this prop
+          />
+        )}
+
+        <View style={styles.controls}>
+          <Button title="Pause Scanning" onPress={pauseScanning} />
+          <Button title="Resume Scanning" onPress={resumeScanning} />
+          <Button title="Stop Scanner" onPress={() => setIsActive(false)} />
+          <Button title="Restart Scanner" onPress={() => setIsActive(true)} />
+        </View>
+
+        {scannedData && (
+          <View style={styles.result}>
+            <Text style={styles.resultText}>
+              Scanned Data: {scannedData?.data}
+            </Text>
+            <Text style={styles.resultText}>Type: {scannedData?.type}</Text>
+            <Text style={styles.resultText}>
+              Bounds: {JSON.stringify(scannedData?.bounds)}
+            </Text>
+          </View>
+        )}
       </SafeAreaView>
     );
   } else {
     return (
-      <Text style={{ fontSize: 30, color: 'red' }}>
+      <Text style={{fontSize: 30, color: 'red'}}>
         You need to grant camera permission first
       </Text>
     );
   }
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  scanner: {
+    flex: 1,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginHorizontal: 10,
+  },
+  result: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  resultText: {
+    fontSize: 16,
+    marginVertical: 4,
+  },
+});
 ```
 
 </details>
@@ -280,10 +374,22 @@ export default function App() {
 
 #### `onQrScanned` (required)
 
-propType: `func.isRequired`
+propType: `function.isRequired`
 default: `(e) => (console.log('QR code scanned!', e))`
 
 In the event that a QR code or barcode is detected in the camera's view, this specified method will be called.
+
+#### `pauseAfterCapture` (required)
+propType: `boolean`
+default: `false`
+
+If set to `true`, the scanner will pause after capturing a QR code or barcode.
+
+#### `isActive` (required)
+propType: `boolean`
+default: `true`
+
+If set to `false`, the scanner will be disabled. This can be useful when you want to pause the scanner.
 
 ## Native Commands
 
@@ -316,6 +422,26 @@ This command is used to release the camera.
 ```js
 if(cameraRef.current) {
   Commands.releaseCamera(cameraRef.current);
+}
+```
+
+### `pauseScanning`
+
+This command is used to pause the scanning.
+
+```js
+if(cameraRef.current) {
+  Commands.pauseScanning(cameraRef.current);
+}
+```
+
+### `resumeScanning`
+
+This command is used to resume the scanning.
+
+```js
+if(cameraRef.current) {
+  Commands.resumeScanning(cameraRef.current);
 }
 ```
 

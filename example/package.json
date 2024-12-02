@@ -11,7 +11,7 @@
     "xcode": "xed -b ios"
   },
   "dependencies": {
-    "@pushpendersingh/react-native-scanner": "1.3.0-beta.2",
+    "@pushpendersingh/react-native-scanner": "1.3.1",
     "react": "18.3.1",
     "react-native": "0.76.0",
     "react-native-permissions": "^5.0.1"

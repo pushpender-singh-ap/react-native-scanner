@@ -21,8 +21,8 @@ using namespace facebook::react;
     AVCaptureMetadataOutput *_output;
     AVCaptureVideoPreviewLayer *_prevLayer;
     
-    BOOL pauseAfterCapture = NO; // Pause after capturing a barcode / or or not (default: NO)
-    BOOL isActive = YES; // Start the camera when the component is mounted (default: YES)
+    BOOL pauseAfterCapture;
+    BOOL isActive;
 }
 
 + (NSArray *)metadataObjectTypes

@@ -156,15 +156,23 @@ dependencies {
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
-  //Camera-X
-  def camerax_version = "1.2.1"
+  def camerax_version = "1.5.0-alpha04"
+  // The following line is optional, as the core library is included indirectly by camera-camera2
   implementation "androidx.camera:camera-core:${camerax_version}"
   implementation "androidx.camera:camera-camera2:${camerax_version}"
+  // If you want to additionally use the CameraX Lifecycle library
   implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+  // If you want to additionally use the CameraX VideoCapture library
+  implementation "androidx.camera:camera-video:${camerax_version}"
+  // If you want to additionally use the CameraX View class
   implementation "androidx.camera:camera-view:${camerax_version}"
+  // If you want to additionally add CameraX ML Kit Vision Integration
+  implementation "androidx.camera:camera-mlkit-vision:${camerax_version}"
+  // If you want to additionally use the CameraX Extensions library
+  implementation "androidx.camera:camera-extensions:${camerax_version}"
 
   //MLkit Barcode scanning
-  implementation 'com.google.mlkit:barcode-scanning:17.0.3'
+  implementation 'com.google.mlkit:barcode-scanning:17.3.0'
 }
 
 if (isNewArchitectureEnabled()) {

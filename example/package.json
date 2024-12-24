@@ -8,10 +8,11 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "xcode": "xed -b ios"
+    "xcode": "xed -b ios",
+    "clear": "watchman watch-del-all"
   },
   "dependencies": {
-    "@pushpendersingh/react-native-scanner": "1.3.1",
+    "@pushpendersingh/react-native-scanner": "^1.4.0",
     "react": "18.3.1",
     "react-native": "0.76.0",
     "react-native-permissions": "^5.0.1"

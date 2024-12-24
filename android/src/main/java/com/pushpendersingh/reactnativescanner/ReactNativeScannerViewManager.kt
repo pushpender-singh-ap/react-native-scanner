@@ -11,7 +11,8 @@ import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerDelegate
 
 @ReactModule(name = ReactNativeScannerViewManager.NAME)
 class ReactNativeScannerViewManager(private val mCallerContext: ReactApplicationContext) :
-  SimpleViewManager<ReactNativeScannerView>(), ReactNativeScannerViewManagerInterface<ReactNativeScannerView?> {
+  SimpleViewManager<ReactNativeScannerView>(),
+  ReactNativeScannerViewManagerInterface<ReactNativeScannerView?> {
 
   private val mDelegate: ViewManagerDelegate<ReactNativeScannerView>
 
@@ -32,6 +33,11 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.setPauseAfterCapture(value)
   }
 
+  @ReactProp(name = "showBox")
+  override fun setShowBox(view: ReactNativeScannerView?, value: Boolean) {
+    view?.setShowBox(value)
+  }
+
   @ReactProp(name = "isActive")
   override fun setIsActive(view: ReactNativeScannerView?, value: Boolean) {
     view?.setIsActive(value)
@@ -49,12 +55,19 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     view?.releaseCamera()
   }
 
-  override fun pauseScanning(view: ReactNativeScannerView?) {
-    view?.pauseScanning()
+  override fun stopScanning(view: ReactNativeScannerView?) {
+    view?.stopScanning()
   }
 
   override fun resumeScanning(view: ReactNativeScannerView?) {
     view?.resumeScanning()
+  }
+
+  override fun startCamera(view: ReactNativeScannerView?) {
+    val reactAppContext = view?.context as? ReactApplicationContext
+    reactAppContext?.let {
+      view.setUpCamera(it)
+    }
   }
 
   override fun createViewInstance(reactContext: ThemedReactContext): ReactNativeScannerView {

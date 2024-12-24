@@ -1,69 +1,99 @@
 package com.pushpendersingh.reactnativescanner
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
 import android.view.Choreographer
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContext
-import com.facebook.react.uimanager.UIManagerHelper
-import com.facebook.react.uimanager.events.EventDispatcher
+import com.facebook.react.uimanager.events.RCTEventEmitter
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.camera.core.CameraControl
+import androidx.camera.mlkit.vision.MlKitAnalyzer
+import androidx.camera.view.CameraController
+import android.util.Log
 
-class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
+class ReactNativeScannerView(context: Context) : LinearLayout(context) {
+
+    private val TAG = "ReactNativeScannerView"
 
     private var preview: PreviewView
     private var mCameraProvider: ProcessCameraProvider? = null
-    private lateinit var cameraExecutor: ExecutorService
+    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private lateinit var options: BarcodeScannerOptions
     private lateinit var scanner: BarcodeScanner
-    private var analysisUseCase: ImageAnalysis = ImageAnalysis.Builder()
-        .build()
     private lateinit var cameraControl: CameraControl
+    private lateinit var lifecycleCameraController: LifecycleCameraController
+    private lateinit var overlay: BarcodeOverlayView
+    private var showBoxFromUser = false
 
+    @Volatile
     private var isCameraRunning: Boolean = false
+    @Volatile
     private var pauseAfterCapture: Boolean = false
+    @Volatile
     private var isActive: Boolean = true
 
+    private lateinit var surfacePreview: Preview
+    private lateinit var imageAnalysis: ImageAnalysis
+    private lateinit var mlKitAnalyzer: MlKitAnalyzer
+
+    // Handler and Runnable for hiding the box after delay
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideBoxRunnable = Runnable {
+        overlay.setShowBox(false)
+        overlay.setRect(null, false)
+    }
+
     companion object {
-        private val REQUIRED_PERMISSIONS =
-            mutableListOf(
-                Manifest.permission.CAMERA
-            ).toTypedArray()
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 
     init {
-        val linearLayoutParams = ViewGroup.LayoutParams(
+        layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        layoutParams = linearLayoutParams
         orientation = VERTICAL
 
-        preview = PreviewView(context)
-        preview.layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
+        preview = PreviewView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
         addView(preview)
+
+        overlay = BarcodeOverlayView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        addView(overlay)
 
         setupLayoutHack()
         manuallyLayoutChildren()
@@ -95,8 +125,6 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
             startCamera(reactApplicationContext)
         }
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
         options = BarcodeScannerOptions.Builder()
             .setBarcodeFormats(
                 Barcode.FORMAT_QR_CODE,
@@ -116,127 +144,170 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
             .build()
         scanner = BarcodeScanning.getClient(options)
 
-        analysisUseCase.setAnalyzer(
-            // newSingleThreadExecutor() will let us perform analysis on a single worker thread
-            Executors.newSingleThreadExecutor()
-        ) { imageProxy ->
-            processImageProxy(scanner, imageProxy, reactApplicationContext)
+        lifecycleCameraController = LifecycleCameraController(context).apply {
+            bindToLifecycle(reactApplicationContext.currentActivity as AppCompatActivity)
+            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
         }
-    }
 
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun processImageProxy(
-        barcodeScanner: BarcodeScanner,
-        imageProxy: ImageProxy,
-        reactApplicationContext: ReactApplicationContext
-    ) {
-        imageProxy.image?.let { image ->
-            val inputImage =
-                InputImage.fromMediaImage(
-                    image,
-                    imageProxy.imageInfo.rotationDegrees
-                )
+        preview.controller = lifecycleCameraController
 
-            if (!isCameraRunning) {
-                return;
+        mlKitAnalyzer = MlKitAnalyzer(
+            listOf(scanner),
+            CameraController.COORDINATE_SYSTEM_VIEW_REFERENCED,
+            ContextCompat.getMainExecutor(context)
+        ) { result ->
+            if (!isCameraRunning || !isActive) return@MlKitAnalyzer
+
+            val barcodes = result?.getValue(scanner).orEmpty()
+            val barcode = barcodes.firstOrNull { !it.rawValue.isNullOrEmpty() }
+            barcode?.boundingBox?.let { bounds ->
+                if (showBoxFromUser) {
+                    updateOverlay(bounds, true)
+                    handler.removeCallbacks(hideBoxRunnable)
+                    handler.postDelayed(hideBoxRunnable, 1000)
+                }
+                sendBarcodeEvent(barcode.rawValue ?: "", bounds, showBoxFromUser, barcode.format)
+
+                if (pauseAfterCapture) {
+                    stopScanning()
+                }
+            }
+        }
+
+        imageAnalysis = ImageAnalysis.Builder()
+            .build()
+            .also {
+                it.setAnalyzer(cameraExecutor, mlKitAnalyzer)
             }
 
-            barcodeScanner.process(inputImage)
-                .addOnSuccessListener { barcodeList ->
-                    if (barcodeList.isNotEmpty()) {
-                        if (pauseAfterCapture) {
-                            pauseScanning()
-                        }
+        lifecycleCameraController.setImageAnalysisAnalyzer(
+            cameraExecutor,
+            mlKitAnalyzer
+        )
+        lifecycleCameraController.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
+    }
 
-                        val surfaceId = UIManagerHelper.getSurfaceId(reactApplicationContext)
-                        val reactContext = context as ReactContext
-                        val eventDispatcher: EventDispatcher? = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
+    private fun updateOverlay(rect: Rect, showBox: Boolean) {
+        overlay.setRect(rect, showBox)
+    }
 
-                        barcodeList.forEach { barcode ->
-                            barcode?.let { code ->
-                                code.cornerPoints?.let { cornerPoints ->
-                                    code.boundingBox?.let { bounds ->
-                                        eventDispatcher?.dispatchEvent(ReactNativeScannerViewEvent(surfaceId, id, code.rawValue?: "", bounds, cornerPoints, code.format))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .addOnFailureListener {
-                    // This failure will happen if the barcode scanning model
-                    // fails to download from Google Play Services
-                }.addOnCompleteListener {
-                    // When the image is from CameraX analysis use case, must
-                    // call image.close() on received images when finished
-                    // using them. Otherwise, new images may not be received
-                    // or the camera may stall.
-                    imageProxy.image?.close()
-                    imageProxy.close()
-                }
+    private fun sendBarcodeEvent(data: String, bounds: Rect, showBox: Boolean, type: Int) {
+        val reactContext = context as ReactContext
+        val event = Arguments.createMap().apply {
+            putString("data", data)
+            putString("type", when (type) {
+                Barcode.FORMAT_QR_CODE -> "QR_CODE"
+                Barcode.FORMAT_AZTEC -> "AZTEC"
+                Barcode.FORMAT_CODE_128 -> "CODE_128"
+                Barcode.FORMAT_CODE_39 -> "CODE_39"
+                Barcode.FORMAT_CODE_93 -> "CODE_93"
+                Barcode.FORMAT_CODABAR -> "CODABAR"
+                Barcode.FORMAT_DATA_MATRIX -> "DATA_MATRIX"
+                Barcode.FORMAT_EAN_13 -> "EAN_13"
+                Barcode.FORMAT_EAN_8 -> "EAN_8"
+                Barcode.FORMAT_ITF -> "ITF"
+                Barcode.FORMAT_PDF417 -> "PDF417"
+                Barcode.FORMAT_UPC_A -> "UPC_A"
+                Barcode.FORMAT_UPC_E -> "UPC_E"
+                else -> "UNKNOWN"
+            })
+            putBoolean("showBox", showBox)
+            putMap("bounds", Arguments.createMap().apply {
+                putDouble("width", bounds.width().toDouble())
+                putDouble("height", bounds.height().toDouble())
+                putMap("origin", Arguments.createMap().apply {
+                    putMap("topLeft", Arguments.createMap().apply {
+                        putDouble("x", bounds.left.toDouble())
+                        putDouble("y", bounds.top.toDouble())
+                    })
+                    putMap("bottomLeft", Arguments.createMap().apply {
+                        putDouble("x", bounds.left.toDouble())
+                        putDouble("y", bounds.bottom.toDouble())
+                    })
+                    putMap("bottomRight", Arguments.createMap().apply {
+                        putDouble("x", bounds.right.toDouble())
+                        putDouble("y", bounds.bottom.toDouble())
+                    })
+                    putMap("topRight", Arguments.createMap().apply {
+                        putDouble("x", bounds.right.toDouble())
+                        putDouble("y", bounds.top.toDouble())
+                    })
+                })
+            })
         }
+        reactContext.getJSModule(RCTEventEmitter::class.java).receiveEvent(id, "onQrScanned", event)
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(
-            context, it
-        ) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun startCamera(reactApplicationContext: ReactApplicationContext) {
-
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-            mCameraProvider = cameraProvider
-            // Preview
-            val surfacePreview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(preview.surfaceProvider)
-                }
-
-            // Select back camera as a default
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-            isCameraRunning = true
-
             try {
-                // Unbind use cases before rebinding
+                val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+                mCameraProvider = cameraProvider
+
+                surfacePreview = Preview.Builder()
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(preview.surfaceProvider)
+                    }
+
+                imageAnalysis = ImageAnalysis.Builder()
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor, mlKitAnalyzer)
+                    }
+
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                isCameraRunning = true
+
                 cameraProvider.unbindAll()
 
-                // Bind use cases to camera
                 val camera = cameraProvider.bindToLifecycle(
-                    (reactApplicationContext.currentActivity as AppCompatActivity),
+                    reactApplicationContext.currentActivity as AppCompatActivity,
                     cameraSelector,
                     surfacePreview,
-                    analysisUseCase
+                    imageAnalysis
                 )
                 cameraControl = camera.cameraControl
-
             } catch (exc: Exception) {
+                Log.e(TAG, "Error starting camera: ${exc.message}")
                 isCameraRunning = false
             }
         }, ContextCompat.getMainExecutor(context))
     }
 
     fun enableFlashlight() {
-        cameraControl.enableTorch(true)
+        try {
+            cameraControl.enableTorch(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error enabling flashlight: ${e.message}")
+        }
     }
 
     fun disableFlashlight() {
-        cameraControl.enableTorch(false)
+        try {
+            cameraControl.enableTorch(false)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error disabling flashlight: ${e.message}")
+        }
     }
 
     fun releaseCamera() {
-        cameraExecutor.shutdown()
-        mCameraProvider?.unbindAll()
-    }
-
-    private fun stopCamera() {
-
+        try {
+            cameraExecutor.shutdown()
+            isCameraRunning = false
+            imageAnalysis.clearAnalyzer()
+            lifecycleCameraController.unbind()
+            mCameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing camera: ${e.message}")
+        }
     }
 
     fun setPauseAfterCapture(value: Boolean) {
@@ -247,30 +318,83 @@ class ReactNativeScannerView(context: Context) :  LinearLayout(context) {
         isActive = value
     }
 
-    fun pauseScanning() {
+    @Synchronized
+    fun stopScanning() {
         if (isCameraRunning) {
-            isCameraRunning = false
-            mCameraProvider?.unbind(analysisUseCase)
+            try {
+                isCameraRunning = false
+                imageAnalysis.clearAnalyzer()
+                lifecycleCameraController.unbind()
+                mCameraProvider?.unbindAll()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error pausing camera: ${e.message}")
+            }
         }
     }
 
+    @Synchronized
     fun resumeScanning() {
         if (!isCameraRunning) {
-            isCameraRunning = true
-
             try {
                 val reactContext = context as ReactContext
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
-                // Bind use cases to camera
                 mCameraProvider?.bindToLifecycle(
-                    (reactContext.currentActivity as AppCompatActivity),
+                    reactContext.currentActivity as AppCompatActivity,
                     cameraSelector,
-                    analysisUseCase
+                    surfacePreview,
+                    imageAnalysis
                 )
+                isCameraRunning = true
             } catch (exc: Exception) {
+                Log.e(TAG, "Error resuming camera: ${exc.message}")
                 isCameraRunning = false
             }
         }
+    }
+
+    fun setShowBox(showBox: Boolean) {
+        showBoxFromUser = showBox
+        if (!showBox) {
+            overlay.setRect(null, false)
+        }
+        overlay.setShowBox(showBox)
+    }
+
+    inner class BarcodeOverlayView(context: Context) : View(context) {
+        private var rect: Rect? = null
+        private var showBox: Boolean = false
+        private val paint = Paint().apply {
+            color = Color.GREEN
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+        }
+
+        fun setRect(rect: Rect?, showBox: Boolean) {
+            this.rect = rect
+            this.showBox = showBox
+            invalidate()
+        }
+
+        fun setShowBox(showBox: Boolean) {
+            this.showBox = showBox
+            if (!showBox) {
+                rect = null
+            }
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            if (showBox && rect != null) {
+                canvas.drawRect(rect!!, paint)
+            }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        handler.removeCallbacksAndMessages(null)
+        releaseCamera()
     }
 }

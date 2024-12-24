@@ -113,14 +113,26 @@ export default function App() {
   const handleBarcodeScanned = event => {
     const {data, bounds, type} = event?.nativeEvent;
     setScannedData({data, bounds, type});
-    console.log('Barcode scanned:', data, bounds, type);
+    console.log('Barcode / QR Code scanned:', data, bounds, type);
+  };
+
+  const enableFlashlight = () => {
+    if (scannerRef?.current) {
+      Commands.enableFlashlight(scannerRef.current);
+    }
+  };
+
+  const disableFlashlight = () => {
+    if (scannerRef?.current) {
+      Commands.disableFlashlight(scannerRef.current);
+    }
   };
 
   // Pause the camera after barcode / QR code is scanned
-  const pauseScanning = () => {
+  const stopScanning = () => {
     if (scannerRef?.current) {
-      Commands.pauseScanning(scannerRef?.current);
-      console.log('Camera preview paused');
+      Commands.stopScanning(scannerRef?.current);
+      console.log('Scanning paused');
     }
   };
 
@@ -128,9 +140,21 @@ export default function App() {
   const resumeScanning = () => {
     if (scannerRef?.current) {
       Commands.resumeScanning(scannerRef?.current);
-      console.log('Camera preview resumed');
+      console.log('Scanning resumed');
     }
   };
+
+  const releaseCamera = () => {
+    if (scannerRef?.current) {
+      Commands.releaseCamera(scannerRef?.current);
+    }
+  }
+
+  const startScanning = () => {
+    if (scannerRef?.current) {
+      Commands.startCamera(scannerRef?.current);
+    }
+  }
 
   const checkCameraPermission = async () => {
     request(
@@ -165,22 +189,57 @@ export default function App() {
 
   if (isCameraPermissionGranted) {
     return (
-      <SafeAreaView style={{flex: 1}}>
+      <SafeAreaView style={styles.container}>
         {isActive && (
           <ReactNativeScannerView
             ref={scannerRef}
             style={styles.scanner}
             onQrScanned={handleBarcodeScanned}
-            pauseAfterCapture={false} // Pause the scanner after barcode / QR code is scanned
+            pauseAfterCapture={true} // Pause the scanner after barcode / QR code is scanned
             isActive={isActive} // Start / stop the scanner using this prop
+            showBox={true} // Show the box around the barcode / QR code
           />
         )}
 
         <View style={styles.controls}>
-          <Button title="Pause Scanning" onPress={pauseScanning} />
-          <Button title="Resume Scanning" onPress={resumeScanning} />
-          <Button title="Stop Scanner" onPress={() => setIsActive(false)} />
-          <Button title="Restart Scanner" onPress={() => setIsActive(true)} />
+          <Button
+            title="Stop Scanning"
+            onPress={() => {
+              stopScanning();
+              setIsActive(false);
+            }}
+          />
+          <Button
+            title="Resume Scanning"
+            onPress={() => {
+              resumeScanning();
+              setIsActive(true);
+            }}
+          />
+          <Button
+            title="Flash Off"
+            onPress={() => {
+              disableFlashlight();
+            }}
+          />
+          <Button
+            title="Flash On"
+            onPress={() => {
+              enableFlashlight();
+            }}
+          />
+          <Button
+            title="Release Camera"
+            onPress={() => {
+              releaseCamera();
+            }}
+          />
+          <Button
+            title="Start Camera"
+            onPress={() => {
+              startScanning();
+            }}
+          />
         </View>
 
         {scannedData && (
@@ -189,16 +248,13 @@ export default function App() {
               Scanned Data: {scannedData?.data}
             </Text>
             <Text style={styles.resultText}>Type: {scannedData?.type}</Text>
-            <Text style={styles.resultText}>
-              Bounds: {JSON.stringify(scannedData?.bounds)}
-            </Text>
           </View>
         )}
       </SafeAreaView>
     );
   } else {
     return (
-      <Text style={{fontSize: 30, color: 'red'}}>
+      <Text style={styles.TextStyle}>
         You need to grant camera permission first
       </Text>
     );
@@ -208,8 +264,12 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+  },
+  box: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'green',
+    zIndex: 10,
   },
   scanner: {
     flex: 1,
@@ -231,6 +291,10 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 16,
     marginVertical: 4,
+  },
+  TextStyle: {
+    fontSize: 30,
+    color: 'red',
   },
 });
 ```
@@ -385,6 +449,12 @@ default: `false`
 
 If set to `true`, the scanner will pause after capturing a QR code or barcode.
 
+#### `showBox` (optional)
+propType: `boolean`
+default: `false`
+
+If set to `true`, a green box will be displayed around the QR code or barcode that is detected.
+
 #### `isActive` (required)
 propType: `boolean`
 default: `true`
@@ -420,18 +490,28 @@ if(cameraRef.current) {
 This command is used to release the camera.
 
 ```js
-if(cameraRef.current) {
-  Commands.releaseCamera(cameraRef.current);
+if(cameraRef?.current) {
+  Commands?.releaseCamera(cameraRef?.current);
 }
 ```
 
-### `pauseScanning`
+#### `startCamera`
 
-This command is used to pause the scanning.
+This command is used to start the camera.
+
+```js
+if(cameraRef?.current) {
+  Commands.startCamera(cameraRef?.current);
+}
+```
+
+#### `stopScanning`
+
+This command is used to stop the scanning.
 
 ```js
 if(cameraRef.current) {
-  Commands.pauseScanning(cameraRef.current);
+  Commands.stopScanning(cameraRef.current);
 }
 ```
 

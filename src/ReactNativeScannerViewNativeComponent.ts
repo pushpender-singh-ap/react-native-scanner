@@ -33,16 +33,20 @@ interface NativeCommands {
   releaseCamera: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>
   ) => Promise<void>;
-  pauseScanning: (
+  stopScanning: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>
   ) => void;
   resumeScanning: (
+    viewRef: React.ElementRef<HostComponent<NativeProps>>
+  ) => void;
+  startCamera: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>
   ) => void;
 }
 
 interface NativeProps extends ViewProps {
   pauseAfterCapture?: boolean;
+  showBox: boolean;
   isActive?: boolean;
   onQrScanned?: DirectEventHandler<Event>; // Event handler for QR code scanned
 }
@@ -52,8 +56,9 @@ export const Commands = codegenNativeCommands<NativeCommands>({
     'enableFlashlight',
     'disableFlashlight',
     'releaseCamera',
-    'pauseScanning',
+    'stopScanning',
     'resumeScanning',
+    'startCamera',
   ],
 });
 

@@ -37,10 +37,22 @@ export default function App() {
     console.log('Barcode / QR Code scanned:', data, bounds, type);
   };
 
-  // Pause the camera after barcode / QR code is scanned
-  const pauseScanning = () => {
+  const enableFlashlight = () => {
     if (scannerRef?.current) {
-      Commands.pauseScanning(scannerRef?.current);
+      Commands.enableFlashlight(scannerRef.current);
+    }
+  };
+
+  const disableFlashlight = () => {
+    if (scannerRef?.current) {
+      Commands.disableFlashlight(scannerRef.current);
+    }
+  };
+
+  // Pause the camera after barcode / QR code is scanned
+  const stopScanning = () => {
+    if (scannerRef?.current) {
+      Commands.stopScanning(scannerRef?.current);
       console.log('Scanning paused');
     }
   };
@@ -52,6 +64,18 @@ export default function App() {
       console.log('Scanning resumed');
     }
   };
+
+  const releaseCamera = () => {
+    if (scannerRef?.current) {
+      Commands.releaseCamera(scannerRef?.current);
+    }
+  }
+
+  const startScanning = () => {
+    if (scannerRef?.current) {
+      Commands.startCamera(scannerRef?.current);
+    }
+  }
 
   const checkCameraPermission = async () => {
     request(
@@ -92,16 +116,51 @@ export default function App() {
             ref={scannerRef}
             style={styles.scanner}
             onQrScanned={handleBarcodeScanned}
-            pauseAfterCapture={false} // Pause the scanner after barcode / QR code is scanned
+            pauseAfterCapture={true} // Pause the scanner after barcode / QR code is scanned
             isActive={isActive} // Start / stop the scanner using this prop
+            showBox={true} // Show the box around the barcode / QR code
           />
         )}
 
         <View style={styles.controls}>
-          <Button title="Pause Scanning" onPress={pauseScanning} />
-          <Button title="Resume Scanning" onPress={resumeScanning} />
-          <Button title="Stop Scanner" onPress={() => setIsActive(false)} />
-          <Button title="Restart Scanner" onPress={() => setIsActive(true)} />
+          <Button
+            title="Stop Scanning"
+            onPress={() => {
+              stopScanning();
+              setIsActive(false);
+            }}
+          />
+          <Button
+            title="Resume Scanning"
+            onPress={() => {
+              resumeScanning();
+              setIsActive(true);
+            }}
+          />
+          <Button
+            title="Flash Off"
+            onPress={() => {
+              disableFlashlight();
+            }}
+          />
+          <Button
+            title="Flash On"
+            onPress={() => {
+              enableFlashlight();
+            }}
+          />
+          <Button
+            title="Release Camera"
+            onPress={() => {
+              releaseCamera();
+            }}
+          />
+          <Button
+            title="Start Camera"
+            onPress={() => {
+              startScanning();
+            }}
+          />
         </View>
 
         {scannedData && (
@@ -110,9 +169,6 @@ export default function App() {
               Scanned Data: {scannedData?.data}
             </Text>
             <Text style={styles.resultText}>Type: {scannedData?.type}</Text>
-            <Text style={styles.resultText}>
-              Bounds: {JSON.stringify(scannedData?.bounds)}
-            </Text>
           </View>
         )}
       </SafeAreaView>
@@ -129,6 +185,12 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  box: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'green',
+    zIndex: 10,
   },
   scanner: {
     flex: 1,

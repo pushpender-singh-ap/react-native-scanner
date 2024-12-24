@@ -116,7 +116,7 @@ export default function App() {
             ref={scannerRef}
             style={styles.scanner}
             onQrScanned={handleBarcodeScanned}
-            pauseAfterCapture={true} // Pause the scanner after barcode / QR code is scanned
+            pauseAfterCapture={false} // Pause the scanner after barcode / QR code is scanned
             isActive={isActive} // Start / stop the scanner using this prop
             showBox={true} // Show the box around the barcode / QR code
           />

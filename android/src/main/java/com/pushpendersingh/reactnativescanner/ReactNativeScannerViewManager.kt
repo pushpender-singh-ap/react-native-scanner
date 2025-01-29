@@ -12,7 +12,7 @@ import com.facebook.react.viewmanagers.ReactNativeScannerViewManagerDelegate
 @ReactModule(name = ReactNativeScannerViewManager.NAME)
 class ReactNativeScannerViewManager(private val mCallerContext: ReactApplicationContext) :
   SimpleViewManager<ReactNativeScannerView>(),
-  ReactNativeScannerViewManagerInterface<ReactNativeScannerView?> {
+  ReactNativeScannerViewManagerInterface<ReactNativeScannerView> {
 
   private val mDelegate: ViewManagerDelegate<ReactNativeScannerView>
 
@@ -20,7 +20,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     mDelegate = ReactNativeScannerViewManagerDelegate(this)
   }
 
-  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView>? {
+  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView> {
     return mDelegate
   }
 

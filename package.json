@@ -1,6 +1,6 @@
 {
   "name": "@pushpendersingh/react-native-scanner",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A QR code & Barcode Scanner for React Native Projects.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -89,7 +89,7 @@
   "engines": {
     "node": ">= 16.0.0"
   },
-  "packageManager": "^yarn@1.22.22",
+  "packageManager": "yarn@1.22.22",
   "jest": {
     "preset": "react-native",
     "modulePathIgnorePatterns": [

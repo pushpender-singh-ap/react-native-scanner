@@ -20,7 +20,7 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
     mDelegate = ReactNativeScannerViewManagerDelegate(this)
   }
 
-  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView> {
+  override fun getDelegate(): ViewManagerDelegate<ReactNativeScannerView>? {
     return mDelegate
   }
 
@@ -29,42 +29,42 @@ class ReactNativeScannerViewManager(private val mCallerContext: ReactApplication
   }
 
   @ReactProp(name = "pauseAfterCapture")
-  override fun setPauseAfterCapture(view: ReactNativeScannerView?, value: Boolean) {
-    view?.setPauseAfterCapture(value)
+  override fun setPauseAfterCapture(view: ReactNativeScannerView, value: Boolean) {
+    view.setPauseAfterCapture(value)
   }
 
   @ReactProp(name = "showBox")
-  override fun setShowBox(view: ReactNativeScannerView?, value: Boolean) {
-    view?.setShowBox(value)
+  override fun setShowBox(view: ReactNativeScannerView, value: Boolean) {
+    view.setShowBox(value)
   }
 
   @ReactProp(name = "isActive")
-  override fun setIsActive(view: ReactNativeScannerView?, value: Boolean) {
-    view?.setIsActive(value)
+  override fun setIsActive(view: ReactNativeScannerView, value: Boolean) {
+    view.setIsActive(value)
   }
 
-  override fun enableFlashlight(view: ReactNativeScannerView?) {
-    view?.enableFlashlight()
+  override fun enableFlashlight(view: ReactNativeScannerView) {
+    view.enableFlashlight()
   }
 
-  override fun disableFlashlight(view: ReactNativeScannerView?) {
-    view?.disableFlashlight()
+  override fun disableFlashlight(view: ReactNativeScannerView) {
+    view.disableFlashlight()
   }
 
-  override fun releaseCamera(view: ReactNativeScannerView?) {
-    view?.releaseCamera()
+  override fun releaseCamera(view: ReactNativeScannerView) {
+    view.releaseCamera()
   }
 
-  override fun stopScanning(view: ReactNativeScannerView?) {
-    view?.stopScanning()
+  override fun stopScanning(view: ReactNativeScannerView) {
+    view.stopScanning()
   }
 
-  override fun resumeScanning(view: ReactNativeScannerView?) {
-    view?.resumeScanning()
+  override fun resumeScanning(view: ReactNativeScannerView) {
+    view.resumeScanning()
   }
 
-  override fun startCamera(view: ReactNativeScannerView?) {
-    val reactAppContext = view?.context as? ReactApplicationContext
+  override fun startCamera(view: ReactNativeScannerView) {
+    val reactAppContext = view.context as? ReactApplicationContext
     reactAppContext?.let {
       view.setUpCamera(it)
     }

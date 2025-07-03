@@ -1,5 +1,11 @@
 # @pushpendersingh/react-native-scanner
 
+⚠️ Note: This package is currently not compatible with React Native 0.80 due to recent architectural changes.
+If you're using this library, please stick to React Native 0.79 or below for now.
+An update to support React Native 0.80 is planned, but there's no confirmed timeline for release.
+🤝 If you'd like to contribute, please feel free to open a pull request — your support is always welcome!
+Thank you for your understanding.
+
 A QR code & Barcode Scanner for React Native Projects.
 
 For React Native developers that need to scan barcodes and QR codes in their apps, this package is a useful resource. It supports React Native's new Fabric Native architecture and was created in Kotlin and Objective-C.

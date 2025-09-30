@@ -10,12 +10,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
-import {
-  request,
-  PERMISSIONS,
-  openSettings,
-  RESULTS,
-} from 'react-native-permissions'; // For camera permission
 import BarcodeScanner, {
   type BarcodeResult,
   CameraView,
@@ -102,34 +96,36 @@ export default function App() {
   };
 
   const checkCameraPermission = async () => {
-    request(
-      Platform.OS === 'ios'
-        ? PERMISSIONS.IOS.CAMERA
-        : PERMISSIONS.ANDROID.CAMERA
-    ).then(async (result: any) => {
-      switch (result) {
-        case RESULTS.UNAVAILABLE:
-          // console.log('This feature is not available (on this device / in this context)');
-          break;
-        case RESULTS.DENIED:
-          Alert.alert(
-            'Permission Denied',
-            'You need to grant camera permission first'
-          );
-          openSettings();
-          break;
-        case RESULTS.GRANTED:
-          setIsCameraPermissionGranted(true);
-          break;
-        case RESULTS.BLOCKED:
-          Alert.alert(
-            'Permission Blocked',
-            'You need to grant camera permission first'
-          );
-          openSettings();
-          break;
+    try {
+      // Check if permission is already granted
+      const hasPermission = await BarcodeScanner.hasCameraPermission();
+
+      if (hasPermission) {
+        setIsCameraPermissionGranted(true);
+        return;
       }
-    });
+
+      // Request permission if not granted
+      const granted = await BarcodeScanner.requestCameraPermission();
+
+      if (granted) {
+        setIsCameraPermissionGranted(true);
+        Alert.alert('Success', 'Camera permission granted!');
+      } else {
+        setIsCameraPermissionGranted(false);
+        Alert.alert(
+          'Permission Denied',
+          'Camera permission is required to scan barcodes and QR codes.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Try Again', onPress: checkCameraPermission },
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('Error checking camera permission:', error);
+      Alert.alert('Error', 'Failed to check camera permission');
+    }
   };
 
   if (!isCameraPermissionGranted) {

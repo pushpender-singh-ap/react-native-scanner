@@ -240,6 +240,44 @@ await BarcodeScanner.setFlash(false); // Turn off
 
 ---
 
+#### `hasCameraPermission()`
+
+Checks if camera permission is currently granted.
+
+```typescript
+const hasPermission = await BarcodeScanner.hasCameraPermission();
+console.log('Camera permission granted:', hasPermission);
+```
+
+**Returns:** `Promise<boolean>` - `true` if permission granted, `false` otherwise
+
+---
+
+#### `requestCameraPermission()`
+
+Requests camera permission from the user with native promise resolution.
+
+```typescript
+const granted = await BarcodeScanner.requestCameraPermission();
+if (granted) {
+  console.log('Permission granted!');
+  // Start scanning
+} else {
+  console.log('Permission denied');
+  // Show error or guide user to settings
+}
+```
+
+**Returns:** `Promise<boolean>` - `true` if user grants permission, `false` if denied
+
+**Platform Support:**
+- ✅ **iOS**: Fully supported with native callback
+- ✅ **Android**: Fully supported with native callback (API 23+)
+
+**Note:** This method shows the native system permission dialog and waits for the user's response, then resolves the promise based on their choice.
+
+---
+
 ### `CameraView`
 
 React component that renders the camera preview.
@@ -303,9 +341,99 @@ useEffect(() => {
 
 ### Permission Handling
 
-> **⚠️ Important:** We **strongly recommend** using [`react-native-permissions`](https://github.com/zoontek/react-native-permissions) for handling camera permissions in production apps. This provides better UX, more control, and unified API across platforms.
+The library now provides **built-in native camera permission methods** that work seamlessly on both iOS and Android with proper promise resolution based on user response.
 
-#### Recommended: Using react-native-permissions
+#### ✅ Using Built-in Permission Methods (Recommended)
+
+The library includes native methods that handle camera permissions with proper callbacks:
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import { View, Text, Button, Alert } from 'react-native';
+import { BarcodeScanner, CameraView } from '@pushpendersingh/react-native-scanner';
+
+export default function App() {
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    checkPermission();
+  }, []);
+
+  const checkPermission = async () => {
+    const granted = await BarcodeScanner.hasCameraPermission();
+    setHasPermission(granted);
+  };
+
+  const requestPermission = async () => {
+    const granted = await BarcodeScanner.requestCameraPermission();
+    setHasPermission(granted);
+    
+    if (granted) {
+      Alert.alert('Success', 'Camera permission granted!');
+    } else {
+      Alert.alert(
+        'Permission Denied', 
+        'Camera permission is required to scan barcodes'
+      );
+    }
+  };
+
+  const startScanning = async () => {
+    // Check permission before scanning
+    const granted = await BarcodeScanner.hasCameraPermission();
+    
+    if (!granted) {
+      Alert.alert(
+        'Permission Required',
+        'Please grant camera permission to scan barcodes',
+        [{ text: 'Grant Permission', onPress: requestPermission }]
+      );
+      return;
+    }
+
+    setScanning(true);
+    await BarcodeScanner.startScanning((barcode) => {
+      console.log('Scanned:', barcode);
+      BarcodeScanner.stopScanning();
+      setScanning(false);
+    });
+  };
+
+  if (hasPermission === null) {
+    return <Text>Checking camera permission...</Text>;
+  }
+
+  if (hasPermission === false) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ marginBottom: 20 }}>Camera permission not granted</Text>
+        <Button title="Grant Permission" onPress={requestPermission} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <CameraView style={{ flex: 1 }} />
+      <Button 
+        title={scanning ? 'Stop Scanning' : 'Start Scanning'} 
+        onPress={startScanning} 
+      />
+    </View>
+  );
+}
+```
+
+**Key Features:**
+- ✅ **Cross-platform**: Works on both iOS (API 10+) and Android (API 23+)
+- ✅ **Promise-based**: Returns `true` when granted, `false` when denied
+- ✅ **Native callbacks**: Waits for actual user response from system dialog
+- ✅ **No dependencies**: No need for additional permission libraries
+
+#### Alternative: Using react-native-permissions
+
+For more advanced permission handling (checking settings, handling blocked state, etc.), you can use [`react-native-permissions`](https://github.com/zoontek/react-native-permissions):
 
 ```bash
 npm install react-native-permissions
@@ -314,47 +442,53 @@ yarn add react-native-permissions
 ```
 
 ```tsx
-import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { Platform } from 'react-native';
+import { request, check, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { Platform, Linking } from 'react-native';
 
-const requestCameraPermission = async () => {
-  const result = await request(
-    Platform.OS === 'ios' 
-      ? PERMISSIONS.IOS.CAMERA 
-      : PERMISSIONS.ANDROID.CAMERA
-  );
+const checkCameraPermission = async () => {
+  const permission = Platform.select({
+    ios: PERMISSIONS.IOS.CAMERA,
+    android: PERMISSIONS.ANDROID.CAMERA,
+  });
+
+  const result = await check(permission);
   
   switch (result) {
     case RESULTS.GRANTED:
-      return true;
+      return 'granted';
     case RESULTS.DENIED:
-      console.log('Permission denied');
-      return false;
+      return 'denied';
     case RESULTS.BLOCKED:
-      console.log('Permission blocked - open settings');
-      return false;
+      return 'blocked';
     default:
-      return false;
+      return 'unavailable';
   }
 };
-```
-
-#### Using React Native's PermissionsAndroid (Android only)
-
-```tsx
-import { PermissionsAndroid, Platform } from 'react-native';
 
 const requestCameraPermission = async () => {
-  if (Platform.OS === 'android') {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.CAMERA
+  const permission = Platform.select({
+    ios: PERMISSIONS.IOS.CAMERA,
+    android: PERMISSIONS.ANDROID.CAMERA,
+  });
+
+  const result = await request(permission);
+  
+  if (result === RESULTS.BLOCKED) {
+    // User has blocked permission, guide them to settings
+    Alert.alert(
+      'Permission Blocked',
+      'Please enable camera permission in settings',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ]
     );
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
+    return false;
   }
-  return true; // iOS handles via Info.plist
+  
+  return result === RESULTS.GRANTED;
 };
 ```
-
 ---
 
 ## 📋 Supported Barcode Formats
@@ -468,16 +602,15 @@ cd example && yarn android
 
 We're constantly working to improve this library. Here are some planned enhancements:
 
+### Recently Completed ✅
+
+- [x] **Enhanced Permission Handling** - ✅ Implemented proper native permission callback mechanism for `requestCameraPermission()` method with promise resolution based on user response (iOS & Android API 23+)
+
 ### Planned Features
 
-- [ ] **Enhanced Permission Handling** - Implement proper native permission callback mechanism for `requestCameraPermission()` method with promise resolution based on user response
 - [ ] **Barcode Generation** - Add ability to generate barcodes/QR codes
 - [ ] **Image Analysis** - Support scanning barcodes from gallery images
 - [ ] **Advanced Camera Controls** - Zoom, focus, and exposure controls
-
-### Known Limitations
-
-- **Permission Handling**: The built-in `requestCameraPermission()` currently triggers the system dialog but doesn't wait for user response. We recommend using `react-native-permissions` for production apps. A proper implementation with permission callbacks is planned for a future release.
 
 ---
 

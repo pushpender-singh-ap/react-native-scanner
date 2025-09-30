@@ -116,8 +116,9 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
         CAMERA_PERMISSION_REQUEST_CODE
       )
       
-      // Note: In a production app, you should handle the permission result
-      // through onRequestPermissionsResult and use a promise callback
+      // The built-in `requestCameraPermission()` currently triggers the system dialog but doesn't wait for user response. 
+      // We recommend using `react-native-permissions` for production apps. 
+      // A proper implementation with permission callbacks is planned for a future release.
       promise.resolve(false)
     } catch (e: Exception) {
       promise.reject("PERMISSION_REQUEST_ERROR", e.message, e)

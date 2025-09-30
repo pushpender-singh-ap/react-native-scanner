@@ -303,6 +303,44 @@ useEffect(() => {
 
 ### Permission Handling
 
+> **⚠️ Important:** We **strongly recommend** using [`react-native-permissions`](https://github.com/zoontek/react-native-permissions) for handling camera permissions in production apps. This provides better UX, more control, and unified API across platforms.
+
+#### Recommended: Using react-native-permissions
+
+```bash
+npm install react-native-permissions
+# or
+yarn add react-native-permissions
+```
+
+```tsx
+import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { Platform } from 'react-native';
+
+const requestCameraPermission = async () => {
+  const result = await request(
+    Platform.OS === 'ios' 
+      ? PERMISSIONS.IOS.CAMERA 
+      : PERMISSIONS.ANDROID.CAMERA
+  );
+  
+  switch (result) {
+    case RESULTS.GRANTED:
+      return true;
+    case RESULTS.DENIED:
+      console.log('Permission denied');
+      return false;
+    case RESULTS.BLOCKED:
+      console.log('Permission blocked - open settings');
+      return false;
+    default:
+      return false;
+  }
+};
+```
+
+#### Using React Native's PermissionsAndroid (Android only)
+
 ```tsx
 import { PermissionsAndroid, Platform } from 'react-native';
 
@@ -423,6 +461,23 @@ cd example && npx pod-install && yarn ios
 # Android
 cd example && yarn android
 ```
+
+---
+
+## 🚀 Roadmap & Future Improvements
+
+We're constantly working to improve this library. Here are some planned enhancements:
+
+### Planned Features
+
+- [ ] **Enhanced Permission Handling** - Implement proper native permission callback mechanism for `requestCameraPermission()` method with promise resolution based on user response
+- [ ] **Barcode Generation** - Add ability to generate barcodes/QR codes
+- [ ] **Image Analysis** - Support scanning barcodes from gallery images
+- [ ] **Advanced Camera Controls** - Zoom, focus, and exposure controls
+
+### Known Limitations
+
+- **Permission Handling**: The built-in `requestCameraPermission()` currently triggers the system dialog but doesn't wait for user response. We recommend using `react-native-permissions` for production apps. A proper implementation with permission callbacks is planned for a future release.
 
 ---
 

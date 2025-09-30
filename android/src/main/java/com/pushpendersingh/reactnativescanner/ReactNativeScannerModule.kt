@@ -1,6 +1,7 @@
 package com.pushpendersingh.reactnativescanner
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -9,12 +10,30 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.modules.core.PermissionAwareActivity
+import com.facebook.react.modules.core.PermissionListener
 
 @ReactModule(name = ReactNativeScannerModule.NAME)
 class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
   NativeReactNativeScannerSpec(reactContext) {
 
   private val cameraManager: CameraManager = CameraManager(reactContext)
+  private var permissionPromise: Promise? = null
+  
+  private val permissionListener = PermissionListener { requestCode, permissions, grantResults ->
+    if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
+      // Validate that we're handling the correct permission
+      val permissionGranted = permissions.isNotEmpty() &&
+                               permissions[0] == Manifest.permission.CAMERA &&
+                               grantResults.isNotEmpty() && 
+                               grantResults[0] == PackageManager.PERMISSION_GRANTED
+      
+      permissionPromise?.resolve(permissionGranted)
+      permissionPromise = null
+      return@PermissionListener true
+    }
+    false
+  }
 
   override fun getName(): String {
     return NAME
@@ -109,19 +128,33 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
         return
       }
 
-      // Request permission
-      ActivityCompat.requestPermissions(
-        currentActivity,
-        arrayOf(Manifest.permission.CAMERA),
-        CAMERA_PERMISSION_REQUEST_CODE
-      )
+      // Check if there's already a pending permission request
+      if (permissionPromise != null) {
+        promise.reject(
+          "PERMISSION_REQUEST_IN_PROGRESS", 
+          "A camera permission request is already in progress"
+        )
+        return
+      }
+
+      // Store promise to be resolved in permission callback
+      permissionPromise = promise
       
-      // The built-in `requestCameraPermission()` currently triggers the system dialog but doesn't wait for user response. 
-      // We recommend using `react-native-permissions` for production apps. 
-      // A proper implementation with permission callbacks is planned for a future release.
-      promise.resolve(false)
+      // Request permission using PermissionAwareActivity
+      val permissionAwareActivity = currentActivity as? PermissionAwareActivity
+      if (permissionAwareActivity != null) {
+        permissionAwareActivity.requestPermissions(
+          arrayOf(Manifest.permission.CAMERA),
+          CAMERA_PERMISSION_REQUEST_CODE,
+          permissionListener
+        )
+      } else {
+        promise.reject("NO_PERMISSION_AWARE_ACTIVITY", "Current activity does not implement PermissionAwareActivity")
+        permissionPromise = null
+      }
     } catch (e: Exception) {
       promise.reject("PERMISSION_REQUEST_ERROR", e.message, e)
+      permissionPromise = null
     }
   }
 
@@ -137,6 +170,7 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
 
   override fun invalidate() {
     super.invalidate()
+    permissionPromise = null
     cameraManager.releaseCamera()
   }
 

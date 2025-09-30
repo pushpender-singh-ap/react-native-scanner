@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -38,6 +38,7 @@ export default function App() {
         BarcodeScanner.stopScanning();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleBarcodeScanned = (result: BarcodeResult) => {
@@ -191,7 +192,10 @@ export default function App() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={releaseCamera}>
+        <TouchableOpacity
+          style={styles.buttonSecondary}
+          onPress={releaseCamera}
+        >
           <Text style={styles.buttonSecondaryText}>🔓 Release Camera</Text>
         </TouchableOpacity>
       </View>

@@ -1,6 +1,12 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import NativeReactNativeScanner from './NativeReactNativeScanner';
 
+// Augment global type for TurboModule detection
+declare global {
+  // eslint-disable-next-line no-var
+  var __turboModuleProxy: any | undefined;
+}
+
 const LINKING_ERROR =
   `The package '@pushpendersingh/react-native-scanner' doesn't seem to be linked. Make sure: \n\n` +
   Platform.select({ ios: "- Run 'pod install'\n", default: '' }) +
@@ -71,9 +77,9 @@ export class BarcodeScanner {
     // Add new listener BEFORE starting scanning
     this.listener = eventEmitter.addListener(
       'onBarcodeScanned',
-      (result: BarcodeResult) => {
+      (result: any) => {
         console.log('📱 Event received in JS:', result);
-        callback(result);
+        callback(result as BarcodeResult);
       }
     );
 

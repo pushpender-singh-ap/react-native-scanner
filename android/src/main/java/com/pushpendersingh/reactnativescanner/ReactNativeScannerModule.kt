@@ -125,6 +125,15 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
         return
       }
 
+      // Check if there's already a pending permission request
+      if (permissionPromise != null) {
+        promise.reject(
+          "PERMISSION_REQUEST_IN_PROGRESS", 
+          "A camera permission request is already in progress"
+        )
+        return
+      }
+
       // Store promise to be resolved in permission callback
       permissionPromise = promise
       

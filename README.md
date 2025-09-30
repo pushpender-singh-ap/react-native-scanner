@@ -516,13 +516,13 @@ MIT © [Pushpender Singh](https://github.com/pushpender-singh-ap)
 
 ## 📞 Support
 
-- 🐛 [Report a bug](https://github.com/pushpendersingh/react-native-scanner/issues)
-- 💡 [Request a feature](https://github.com/pushpendersingh/react-native-scanner/issues)
+- 🐛 [Report a bug](https://github.com/pushpender-singh-ap/react-native-scanner/issues)
+- 💡 [Request a feature](https://github.com/pushpender-singh-ap/react-native-scanner/issues)
 
 ---
 
 <div align="center">
 
-**If you find this package helpful, please give it a ⭐️ on [GitHub](https://github.com/pushpendersingh/react-native-scanner)!**
+**If you find this package helpful, please give it a ⭐️ on [GitHub](https://github.com/pushpender-singh-ap/react-native-scanner)!**
 
 </div>

@@ -22,7 +22,10 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
   
   private val permissionListener = PermissionListener { requestCode, permissions, grantResults ->
     if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
-      val permissionGranted = grantResults.isNotEmpty() && 
+      // Validate that we're handling the correct permission
+      val permissionGranted = permissions.isNotEmpty() &&
+                               permissions[0] == Manifest.permission.CAMERA &&
+                               grantResults.isNotEmpty() && 
                                grantResults[0] == PackageManager.PERMISSION_GRANTED
       
       permissionPromise?.resolve(permissionGranted)

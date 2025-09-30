@@ -10,6 +10,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.modules.core.PermissionAwareActivity
 import com.facebook.react.modules.core.PermissionListener
 
 @ReactModule(name = ReactNativeScannerModule.NAME)
@@ -128,7 +129,7 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
       permissionPromise = promise
       
       // Request permission using PermissionAwareActivity
-      val permissionAwareActivity = currentActivity as? com.facebook.react.modules.core.PermissionAwareActivity
+      val permissionAwareActivity = currentActivity as? PermissionAwareActivity
       if (permissionAwareActivity != null) {
         permissionAwareActivity.requestPermissions(
           arrayOf(Manifest.permission.CAMERA),

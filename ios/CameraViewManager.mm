@@ -30,13 +30,15 @@ RCT_EXPORT_MODULE(ReactNativeScannerView)
 {
     CameraView *cameraView = [[CameraView alloc] init];
     
-    // Get the camera manager from the module and bind it to the view
-    dispatch_async(dispatch_get_main_queue(), ^{
-        ReactNativeScanner *scannerModule = [self.bridge moduleForClass:[ReactNativeScanner class]];
-        if (scannerModule && scannerModule.cameraManager) {
-            [cameraView setCameraManager:scannerModule.cameraManager];
-        }
-    });
+    // Bind immediately on the current thread (main queue)
+    // Since requiresMainQueueSetup returns YES, we're already on main queue
+    ReactNativeScanner *scannerModule = [self.bridge moduleForClass:[ReactNativeScanner class]];
+    if (scannerModule && scannerModule.cameraManager) {
+        [cameraView setCameraManager:scannerModule.cameraManager];
+        NSLog(@"✅ Camera manager bound to view");
+    } else {
+        NSLog(@"⚠️ Scanner module or camera manager not available");
+    }
     
     return cameraView;
 }

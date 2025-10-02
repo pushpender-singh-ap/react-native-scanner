@@ -8,8 +8,16 @@
 #import <React/RCTViewManager.h>
 #import <React/RCTBridge.h>
 #import <AVFoundation/AVFoundation.h>
-#import "ReactNativeScanner-Swift.h"
 #import "ReactNativeScanner.h"
+
+// Import the Swift bridging header
+#if __has_include(<ReactNativeScanner/ReactNativeScanner-Swift.h>)
+  // For dynamic frameworks or when installed as a framework
+  #import <ReactNativeScanner/ReactNativeScanner-Swift.h>
+#else
+  // For static libraries or when included directly in the project
+  #import "ReactNativeScanner-Swift.h"
+#endif
 
 @interface ReactNativeScannerViewManager : RCTViewManager
 @end

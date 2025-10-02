@@ -38,9 +38,35 @@ public class CameraView: UIView {
     
     @objc public func setCameraManager(_ manager: CameraManager) {
         self.cameraManager = manager
-        if let previewLayer = previewLayer {
-            manager.bindPreviewLayer(previewLayer)
+        
+        // CHANGE: Subscribe to CameraManager's onSessionReady callback.
+        // Reason: CameraView owns the preview layer and binds it to the session on the main thread,
+        // keeping UI work on main and avoiding concurrency violations.
+        manager.onSessionReady = { [weak self] session in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if let previewLayer = self.previewLayer {
+                    previewLayer.session = session
+                    previewLayer.connection?.videoOrientation = .portrait
+                    print("✅ Preview layer bound to session from onSessionReady callback")
+                } else {
+                    print("⚠️ Preview layer missing when session became ready")
+                }
+            }
         }
+        
+        // CHANGE: If a session already exists, bind it immediately on the main thread.
+        // Reason: Ensures the preview shows even if the session was created before the view.
+        if let existingSession = manager.currentSession() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, let previewLayer = self.previewLayer else { return }
+                previewLayer.session = existingSession
+                previewLayer.connection?.videoOrientation = .portrait
+                print("✅ Preview layer bound to existing session")
+            }
+        }
+        
+        print("✅ Camera manager set on CameraView")
     }
     
     public override func layoutSubviews() {
@@ -49,7 +75,10 @@ public class CameraView: UIView {
     }
     
     deinit {
+        // CHANGE: Clear session on teardown to avoid retaining references.
+        previewLayer?.session = nil
         previewLayer?.removeFromSuperlayer()
         previewLayer = nil
     }
 }
+

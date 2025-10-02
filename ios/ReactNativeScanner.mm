@@ -120,7 +120,13 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)invalidate {
-  [_cameraManager releaseCamera];
+  // Capture strong reference to camera manager first to ensure it stays alive during cleanup
+  CameraManager *cameraManager = _cameraManager;
+  
+  if (cameraManager) {
+    [cameraManager releaseCamera];
+  }
+  
   [super invalidate];
 }
 

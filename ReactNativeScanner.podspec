@@ -15,6 +15,18 @@ Pod::Spec.new do |s|
 
   s.source_files = "ios/**/*.{h,m,mm,swift}"
   s.private_header_files = "ios/**/*.h"
+
+  # Enable modules and set the Swift bridging header to allow Swift and Objective-C to interoperate
+  s.pod_target_xcconfig = {
+    # Enables the use of modules (i.e., frameworks) in the generated Xcode project
+    'DEFINES_MODULE' => 'YES',
+    
+    # Sets the name of the generated Swift header for Objective-C code to use
+    'SWIFT_OBJC_INTERFACE_HEADER_NAME' => 'ReactNativeScanner-Swift.h'
+  }
+
+  # The name of the module that will be generated for this pod
+  s.module_name = s.name
   
   # Swift support
   s.swift_version = '5.0'

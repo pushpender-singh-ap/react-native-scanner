@@ -1,18 +1,14 @@
 import React from 'react';
-import { requireNativeComponent } from 'react-native';
 import type { ViewProps } from 'react-native';
+import ReactNativeScannerViewNativeComponent from './ReactNativeScannerViewNativeComponent';
 
 export interface CameraViewProps extends ViewProps {
   style?: ViewProps['style'];
 }
 
-const NativeCameraView = requireNativeComponent<CameraViewProps>(
-  'ReactNativeScannerView'
-);
-
 export const CameraView = React.forwardRef<any, CameraViewProps>(
   (props, ref) => {
-    return <NativeCameraView {...props} ref={ref} />;
+    return <ReactNativeScannerViewNativeComponent {...props} ref={ref} />;
   }
 );
 

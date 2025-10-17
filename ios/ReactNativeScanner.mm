@@ -7,13 +7,8 @@
 #import <ReactNativeScanner/ReactNativeScanner-Swift.h>
 #endif
 
-@interface ReactNativeScanner ()
-@property(nonatomic, strong) CameraManager *cameraManager;
-@end
-
 @implementation ReactNativeScanner
-
-RCT_EXPORT_MODULE()
+@synthesize cameraManager = _cameraManager;
 
 - (instancetype)init {
   if (self = [super init]) {
@@ -27,10 +22,6 @@ RCT_EXPORT_MODULE()
   return _cameraManager;
 }
 
-- (NSArray<NSString *> *)supportedEvents {
-  return @[ @"onBarcodeScanned" ];
-}
-
 - (void)startScanning:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject {
   if (![_cameraManager hasCameraPermission]) {
@@ -42,7 +33,7 @@ RCT_EXPORT_MODULE()
   @try {
     [_cameraManager
         startScanningWithCallback:^(NSDictionary *result) {
-          [self sendEventWithName:@"onBarcodeScanned" body:result];
+          [self emitOnBarcodeScanned:result];
         }
                             error:&error];
     if (error) {
@@ -108,32 +99,26 @@ RCT_EXPORT_MODULE()
   }];
 }
 
-- (void)addListener:(NSString *)eventName {
-  // Required for RCTEventEmitter
-  // Keep track of listeners to avoid "no listeners" warning
-  [super addListener:eventName];
-}
-
-- (void)removeListeners:(double)count {
-  // Required for RCTEventEmitter
-  [super removeListeners:count];
-}
-
 - (void)invalidate {
-  // Capture strong reference to camera manager first to ensure it stays alive during cleanup
+  // Capture strong reference to camera manager first to ensure it stays alive
+  // during cleanup
   CameraManager *cameraManager = _cameraManager;
-  
+
   if (cameraManager) {
     [cameraManager releaseCamera];
   }
-  
-  [super invalidate];
 }
 
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
-    (const facebook::react::ObjCTurboModule::InitParams &)params {
-  return std::make_shared<facebook::react::NativeReactNativeScannerSpecJSI>(
-      params);
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+    return std::make_shared<facebook::react::NativeReactNativeScannerSpecJSI>(params);
+}
+
++ (NSString *)moduleName
+{
+  return @"ReactNativeScanner";
 }
 
 @end
+

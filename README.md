@@ -2,9 +2,10 @@
 
 <div align="center">
 
-![React Native](https://img.shields.io/badge/React%20Native-v0.81+-blue.svg)
+![React Native](https://img.shields.io/badge/React%20Native-v0.80+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-lightgrey.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
 
 **A powerful, easy-to-use QR code & Barcode Scanner for React Native with New Architecture support**
 
@@ -36,6 +37,7 @@ The `@pushpendersingh/react-native-scanner` package also includes a flashlight f
 - 🎯 **Easy Integration** - Simple API with event-based scanning
 - 💡 **Flash Support** - Toggle flashlight on/off
 - 🔄 **Lifecycle Management** - Automatic camera resource handling
+- 🔒 **Thread-Safe** - Modern concurrency patterns (Swift Actors & Kotlin synchronization)
 - 🎨 **Customizable** - Flexible styling options
 
 ---
@@ -516,18 +518,24 @@ This library supports a wide range of barcode formats across different categorie
 ## 🛠️ Technical Details
 
 ### Android
+
 - **CameraX 1.5.0** - Modern camera API with lifecycle awareness
 - **ML Kit Barcode Scanning 17.3.0** - Google's ML-powered barcode detection
-- **Kotlin** - Native implementation
+- **Kotlin** - Native implementation with thread-safe synchronization
+- **Thread Safety** - Uses `@Volatile` and `@Synchronized` for concurrent access protection
 
 ### iOS
+
 - **AVFoundation** - Native camera framework
 - **Vision Framework** - Apple's barcode detection
-- **Swift 5.0** - Native implementation
+- **Swift 5.0+** - Native implementation with modern concurrency
+- **Thread Safety** - Uses Swift Actors for isolated state management and thread-safe operations
 
 ### React Native
+
 - **New Architecture** - Turbo Modules + Fabric support
-- **React Native 0.81+** - Minimum version requirement
+- **React Native 0.80+** - Minimum version requirement
+- **Codegen** - Automatic native interface generation
 
 ---
 

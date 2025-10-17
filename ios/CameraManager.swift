@@ -5,24 +5,97 @@
 //  Created by Pushpender Singh
 //
 
-import Foundation
 @preconcurrency import AVFoundation
+import Foundation
 @preconcurrency import Vision
 
-@objc public class CameraManager: NSObject, @unchecked Sendable {
-    
+// Actor that manages camera session state and operations
+// Ensures all camera operations are thread-safe using Swift's actor isolation
+actor CameraSessionActor {
     private var captureSession: AVCaptureSession?
     private var videoDevice: AVCaptureDevice?
     private var videoOutput: AVCaptureVideoDataOutput?
-    private let sessionQueue = DispatchQueue(label: "com.pushpendersingh.scanner.sessionQueue")
     private var isScanning = false
+    
+    func getSession() -> AVCaptureSession? {
+        return captureSession
+    }
+    
+    func setSession(_ session: AVCaptureSession?) {
+        captureSession = session
+    }
+    
+    func getVideoDevice() -> AVCaptureDevice? {
+        return videoDevice
+    }
+    
+    func setVideoDevice(_ device: AVCaptureDevice?) {
+        videoDevice = device
+    }
+    
+    func getVideoOutput() -> AVCaptureVideoDataOutput? {
+        return videoOutput
+    }
+    
+    func setVideoOutput(_ output: AVCaptureVideoDataOutput?) {
+        videoOutput = output
+    }
+    
+    func getScanningState() -> Bool {
+        return isScanning
+    }
+    
+    func setScanningState(_ scanning: Bool) {
+        isScanning = scanning
+    }
+    
+    // Eliminates race condition between check and set
+    func startScanningIfNotActive() -> Bool {
+        guard !isScanning else { return false }
+        isScanning = true
+        return true
+    }
+
+    // Safe stop operation
+    func stopScanningIfActive() -> Bool {
+        guard isScanning else { return false }
+        isScanning = false
+        return true
+    }
+}
+
+// Actor that manages scan callbacks thread-safely
+actor CallbackActor {
     private var scanCallback: (([String: Any]) -> Void)?
     
+    func setCallback(_ callback: (([String: Any]) -> Void)?) {
+        scanCallback = callback
+    }
+    
+    func getCallback() -> (([String: Any]) -> Void)? {
+        return scanCallback
+    }
+    
+    func invokeCallback(with result: [String: Any]) {
+        if let callback = scanCallback {
+            Task { @MainActor in
+                callback(result)
+            }
+        }
+    }
+}
+
+@objc public class CameraManager: NSObject {
+
+    private let sessionActor = CameraSessionActor()
+    private let callbackActor = CallbackActor()
+    private let sessionQueue = DispatchQueue(label: "com.pushpendersingh.scanner.sessionQueue")
+
     // Session interruption handling
     private var sessionInterruptionObserver: NSObjectProtocol?
     private var sessionInterruptionEndedObserver: NSObjectProtocol?
     @objc public var onSessionReady: ((AVCaptureSession) -> Void)?
-    
+
     // Barcode types to detect
     private let supportedBarcodeTypes: [VNBarcodeSymbology] = [
         .qr,
@@ -36,55 +109,108 @@ import Foundation
         .ean8,
         .itf14,
         .pdf417,
-        .upce
+        .upce,
     ]
-    
+
     @objc public func hasCameraPermission() -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         return status == .authorized
     }
-    
+
     @objc public func requestCameraPermission(completion: @escaping (Bool) -> Void) {
         AVCaptureDevice.requestAccess(for: .video) { granted in
             completion(granted)
         }
     }
-    
-    @objc public func currentSession() -> AVCaptureSession? {
-        // CHANGE: Synchronize the read on sessionQueue to avoid cross-thread access warnings.
-        // Reason: The session is produced/mutated on sessionQueue; reading it from main without
-        // synchronization can trigger structural concurrency diagnostics.
-        return sessionQueue.sync { captureSession }
+
+    // Async version - don't block main thread
+    // Use this from Swift async contexts
+    public func getCurrentSession() async -> AVCaptureSession? {
+        return await sessionActor.getSession()
     }
     
+    // Callback version for Objective-C bridge
+    // Non-blocking alternative for synchronous contexts
+    @objc public func getCurrentSession(completion: @escaping (AVCaptureSession?) -> Void) {
+        Task {
+            let session = await sessionActor.getSession()
+            await MainActor.run {
+                completion(session)
+            }
+        }
+    }
+
     @objc(startScanningWithCallback:error:)
     public func startScanning(callback: @escaping ([String: Any]) -> Void) throws {
-        guard hasCameraPermission() else {
-            throw NSError(domain: "CameraManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Camera permission not granted"])
-        }
-        
-        // Execute on sessionQueue for thread safety
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Check if session is already running
-            if self.isScanning, let session = self.captureSession, session.isRunning {
-                print("⚠️ Session already running, updating callback only")
-                self.scanCallback = callback
-                return
+        // Check permission status immediately, but asynchronously request if needed.
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            // Permission already granted. Proceed with scanning setup.
+            sessionQueue.async { [weak self] in
+                guard let self = self else { return }
+                Task {
+                    await self.configureAndStartScanning(callback: callback)
+                }
             }
-            
-            // Set flag on the same queue where it's checked
-            self.isScanning = true
-            self.scanCallback = callback
-            
-            self.setupCaptureSession()
+        case .notDetermined:
+            // Request permission. The result is handled asynchronously.
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                guard let self = self else { return }
+                self.sessionQueue.async {
+                    Task {
+                        if granted {
+                            await self.configureAndStartScanning(callback: callback)
+                        } else {
+                            // Handle denial.
+                            let errorInfo = ["error": "Camera permission denied"]
+                            await self.callbackActor.invokeCallback(with: errorInfo)
+                        }
+                    }
+                }
+            }
+        case .denied, .restricted:
+            // Handle denied/restricted status immediately.
+            let errorInfo = ["error": "Camera permission not granted"]
+            Task {
+                await callbackActor.invokeCallback(with: errorInfo)
+            }
+        @unknown default:
+            // Handle any future unknown cases.
+            let errorInfo = ["error": "Unknown camera permission status"]
+            Task {
+                await callbackActor.invokeCallback(with: errorInfo)
+            }
         }
     }
-    
-    private func setupCaptureSession() {
+
+    // Private helper with atomic check-and-set
+    // Eliminates race condition in session initialization
+    private func configureAndStartScanning(callback: @escaping ([String: Any]) -> Void) async {
+        // Atomic operation - no race condition
+        guard await sessionActor.startScanningIfNotActive() else {
+            print("⚠️ Session already running, updating callback only")
+            await callbackActor.setCallback(callback)
+            return
+        }
+        
+        // At this point, we're guaranteed to be the only thread starting scanning
+        await callbackActor.setCallback(callback)
+        
+        do {
+            try await setupCaptureSession()
+        } catch {
+            // Reset state on error
+            await sessionActor.setScanningState(false)
+            await callbackActor.setCallback(nil)
+            print("❌ Failed to setup camera session: \(error.localizedDescription)")
+        }
+    }
+
+    private func setupCaptureSession() async throws {
         // Reuse existing session if available
-        if let existingSession = captureSession {
+        let existingSession = await sessionActor.getSession()
+        
+        if let existingSession = existingSession {
             // If session exists but not running, just restart it
             if !existingSession.isRunning {
                 print("♻️ Restarting existing session")
@@ -94,27 +220,29 @@ import Foundation
                 print("⚠️ Session already running")
             }
             if let onSessionReady = self.onSessionReady {
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard self != nil else { return }
                     onSessionReady(existingSession)
                 }
             }
             return
         }
-        
+
         // Create new session only if none exists
         let newSession = AVCaptureSession()
-        
+
         newSession.beginConfiguration()
         newSession.sessionPreset = .high
-        
+
         // Setup video device
-        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+        guard let videoDevice = AVCaptureDevice.default(
+            .builtInWideAngleCamera, for: .video, position: .back)
+        else {
             print("❌ Failed to get video device")
-            isScanning = false
-            return
+            throw CameraError.deviceNotAvailable
         }
-        self.videoDevice = videoDevice
-        
+        await sessionActor.setVideoDevice(videoDevice)
+
         // Setup video input
         do {
             let videoInput = try AVCaptureDeviceInput(device: videoDevice)
@@ -122,118 +250,157 @@ import Foundation
                 newSession.addInput(videoInput)
             } else {
                 print("❌ Cannot add video input")
-                isScanning = false
-                return
+                throw CameraError.cannotAddInput
             }
         } catch {
             print("❌ Error creating video input: \(error.localizedDescription)")
-            isScanning = false
-            return
+            throw error
         }
-        
+
         // Setup video output
         let videoOutput = AVCaptureVideoDataOutput()
         videoOutput.setSampleBufferDelegate(self, queue: sessionQueue)
         videoOutput.alwaysDiscardsLateVideoFrames = true
-        
+
         if newSession.canAddOutput(videoOutput) {
             newSession.addOutput(videoOutput)
-            self.videoOutput = videoOutput
+            await sessionActor.setVideoOutput(videoOutput)
         } else {
             print("❌ Cannot add video output")
-            isScanning = false
-            return
+            throw CameraError.cannotAddOutput
         }
-        
+
         newSession.commitConfiguration()
-        
-        // Assign to property AFTER configuration
-        self.captureSession = newSession
-        
+
+        // Assign to actor AFTER configuration
+        await sessionActor.setSession(newSession)
+
         // Start session (already on sessionQueue)
         newSession.startRunning()
         print("✅ Camera session started - Running: \(newSession.isRunning)")
-        print("✅ Video output delegate set: \(self.videoOutput?.sampleBufferDelegate != nil)")
         
-        // Notify UI after the session is running to avoid startRunning during configuration
+        let output = await sessionActor.getVideoOutput()
+        print("✅ Video output delegate set: \(output?.sampleBufferDelegate != nil)")
+
+        // Notify UI after the session is running
         if let onSessionReady = self.onSessionReady {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard self != nil else { return }
                 onSessionReady(newSession)
             }
         }
     }
     
-    @objc public func stopScanning() {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Set flag first, then stop session
-            self.isScanning = false
-            self.scanCallback = nil
-            
-            if let session = self.captureSession, session.isRunning {
-                session.stopRunning()
-                print("✅ Scanning stopped")
-            } else {
-                print("⚠️ No active session to stop")
+    // Camera error types for better error handling
+    enum CameraError: Error {
+        case deviceNotAvailable
+        case cannotAddInput
+        case cannotAddOutput
+        case sessionNotRunning
+        case torchUnavailable
+        
+        var localizedDescription: String {
+            switch self {
+            case .deviceNotAvailable:
+                return "Camera device not available"
+            case .cannotAddInput:
+                return "Cannot add video input to session"
+            case .cannotAddOutput:
+                return "Cannot add video output to session"
+            case .sessionNotRunning:
+                return "Camera session is not running"
+            case .torchUnavailable:
+                return "Torch/flashlight is not available on this device"
             }
         }
     }
-    
+
+    @objc public func stopScanning() {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            Task {
+                // ✅ Use atomic operation to stop scanning
+                guard await self.sessionActor.stopScanningIfActive() else {
+                    print("⚠️ Scanning is not active")
+                    return
+                }
+                
+                await self.callbackActor.setCallback(nil)
+
+                let session = await self.sessionActor.getSession()
+                if let session = session, session.isRunning {
+                    session.stopRunning()
+                    print("✅ Scanning stopped")
+                } else {
+                    print("⚠️ No active session to stop")
+                }
+            }
+        }
+    }
+
     @objc public func enableFlashlight() {
         // Execute on sessionQueue for thread safety
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
-            
-            // Check if session is running
-            guard let session = self.captureSession, session.isRunning else {
-                print("⚠️ Cannot enable flashlight - camera not running")
-                return
-            }
-            
-            guard let device = self.videoDevice, device.hasTorch else {
-                print("⚠️ Torch not available")
-                return
-            }
-            
-            do {
-                try device.lockForConfiguration()
-                device.torchMode = .on
-                device.unlockForConfiguration()
-                print("✅ Flashlight enabled")
-            } catch {
-                print("❌ Failed to enable torch: \(error.localizedDescription)")
+
+            Task {
+                // Check if session is running
+                let session = await self.sessionActor.getSession()
+                guard let session = session, session.isRunning else {
+                    print("⚠️ Cannot enable flashlight - camera not running")
+                    return
+                }
+
+                let device = await self.sessionActor.getVideoDevice()
+                guard let device = device, device.hasTorch else {
+                    print("⚠️ Torch not available")
+                    return
+                }
+
+                do {
+                    try device.lockForConfiguration()
+                    device.torchMode = .on
+                    device.unlockForConfiguration()
+                    print("✅ Flashlight enabled")
+                } catch {
+                    print("❌ Failed to enable torch: \(error.localizedDescription)")
+                }
             }
         }
     }
-    
+
     @objc public func disableFlashlight() {
         // Execute on sessionQueue for thread safety
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
-            
-            // Check if session is running
-            guard let session = self.captureSession, session.isRunning else {
-                print("⚠️ Cannot disable flashlight - camera not running")
-                return
-            }
-            
-            guard let device = self.videoDevice, device.hasTorch else {
-                print("⚠️ Torch not available")
-                return
-            }
-            
-            do {
-                try device.lockForConfiguration()
-                device.torchMode = .off
-                device.unlockForConfiguration()
-                print("✅ Flashlight disabled")
-            } catch {
-                print("❌ Failed to disable torch: \(error.localizedDescription)")
+
+            Task {
+                // Check if session is running
+                let session = await self.sessionActor.getSession()
+                guard let session = session, session.isRunning else {
+                    print("⚠️ Cannot disable flashlight - camera not running")
+                    return
+                }
+
+                let device = await self.sessionActor.getVideoDevice()
+                guard let device = device, device.hasTorch else {
+                    print("⚠️ Torch not available")
+                    return
+                }
+
+                do {
+                    try device.lockForConfiguration()
+                    device.torchMode = .off
+                    device.unlockForConfiguration()
+                    print("✅ Flashlight disabled")
+                } catch {
+                    print("❌ Failed to disable torch: \(error.localizedDescription)")
+                }
             }
         }
     }
-    
+
     // Setup interruption observers in init
     public override init() {
         super.init()
@@ -242,7 +409,7 @@ import Foundation
             self.setupInterruptionObservers()
         }
     }
-    
+
     @MainActor
     private func setupInterruptionObservers() {
         // Handle session interruption (e.g., incoming call, alarm)
@@ -252,18 +419,20 @@ import Foundation
             queue: nil
         ) { [weak self] notification in
             guard let self = self else { return }
-            
-            if let reasonValue = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int,
-               let reason = AVCaptureSession.InterruptionReason(rawValue: reasonValue) {
+
+            if let reasonValue = notification.userInfo?[AVCaptureSessionInterruptionReasonKey]
+                as? Int,
+                let reason = AVCaptureSession.InterruptionReason(rawValue: reasonValue)
+            {
                 print("⚠️ Session interrupted: \(reason)")
-                
-                // Optionally pause scanning during interruption
-                sessionQueue.async {
-                    self.isScanning = false
+
+                // Pause scanning during interruption
+                Task {
+                    await self.sessionActor.setScanningState(false)
                 }
             }
         }
-        
+
         // Handle session interruption ended
         sessionInterruptionEndedObserver = NotificationCenter.default.addObserver(
             forName: .AVCaptureSessionInterruptionEnded,
@@ -272,18 +441,25 @@ import Foundation
         ) { [weak self] _ in
             guard let self = self else { return }
             print("✅ Session interruption ended")
-            
-            // Resume scanning only if we had a callback (means scanning was active)
-            self.sessionQueue.async {
-                if self.scanCallback != nil, let session = self.captureSession, !session.isRunning {
+
+            // Resume scanning only if we were actually scanning before interruption
+            Task {
+                // Check scanning state first to prevent restarting released session
+                let isScanning = await self.sessionActor.getScanningState()
+                let callback = await self.callbackActor.getCallback()
+                let session = await self.sessionActor.getSession()
+                
+                // Only resume if still supposed to be scanning
+                if isScanning, callback != nil, let session = session, !session.isRunning {
                     session.startRunning()
-                    self.isScanning = true
                     print("✅ Scanning resumed after interruption")
+                } else if !isScanning {
+                    print("ℹ️ Not resuming - scanning was stopped during interruption")
                 }
             }
         }
     }
-    
+
     @objc public func releaseCamera() {
         // Remove observers on main thread to keep lifecycle consistent
         DispatchQueue.main.async { [weak self] in
@@ -297,45 +473,52 @@ import Foundation
                 self.sessionInterruptionEndedObserver = nil
             }
         }
-        
+
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
-            
-            // Stop scanning first
-            self.isScanning = false
-            self.scanCallback = nil
-            
-            // Stop session before modifying it
-            if let session = self.captureSession {
-                if session.isRunning {
-                    session.stopRunning()
+
+            Task {
+                // Stop scanning first
+                await self.sessionActor.setScanningState(false)
+                await self.callbackActor.setCallback(nil)
+
+                // Stop session before modifying it
+                let session = await self.sessionActor.getSession()
+                if let session = session {
+                    if session.isRunning {
+                        session.stopRunning()
+                    }
+
+                    // Use beginConfiguration when removing inputs/outputs
+                    session.beginConfiguration()
+
+                    for input in session.inputs {
+                        session.removeInput(input)
+                    }
+                    for output in session.outputs {
+                        session.removeOutput(output)
+                    }
+
+                    session.commitConfiguration()
                 }
-                
-                // Use beginConfiguration when removing inputs/outputs
-                session.beginConfiguration()
-                
-                for input in session.inputs {
-                    session.removeInput(input)
-                }
-                for output in session.outputs {
-                    session.removeOutput(output)
-                }
-                
-                session.commitConfiguration()
+
+                await self.sessionActor.setSession(nil)
+                await self.sessionActor.setVideoDevice(nil)
+                await self.sessionActor.setVideoOutput(nil)
+
+                print("✅ Camera resources released")
             }
-            
-            self.captureSession = nil
-            self.videoDevice = nil
-            self.videoOutput = nil
-            
-            print("✅ Camera resources released")
         }
-        
+
+        // Clear the onSessionReady callback to prevent retain cycles
+        onSessionReady = nil
+
+        // Re-setup observers for next use
         Task { @MainActor in
             self.setupInterruptionObservers()
         }
     }
-    
+
     // Deinit to cleanup observers
     deinit {
         if let observer = sessionInterruptionObserver {
@@ -348,77 +531,73 @@ import Foundation
     }
 }
 
-// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+// AVCaptureVideoDataOutputSampleBufferDelegate 
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
-    
-    public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // Early exit if not scanning
-        guard isScanning else { return }
-        
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            print("⚠️ Failed to get pixel buffer")
-            return
-        }
-        
-        let imageRequestHandler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-        
-        let barcodeRequest = VNDetectBarcodesRequest { [weak self] request, error in
-            guard let self = self else { return }
-            
-            // Double-check isScanning inside async callback
-            guard self.isScanning else {
-                print("⚠️ Barcode detected but scanning stopped, ignoring")
+
+    public func captureOutput(
+        _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        // Check scanning state using async context
+        Task {
+            let isCurrentlyScanning = await sessionActor.getScanningState()
+            guard isCurrentlyScanning else { return }
+
+            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+                print("⚠️ Failed to get pixel buffer")
                 return
             }
-            
-            if let error = error {
-                print("Barcode detection error: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let results = request.results as? [VNBarcodeObservation],
-                  let firstBarcode = results.first,
-                  let payloadString = firstBarcode.payloadStringValue else {
-                return
-            }
-            
-            print("✅ Barcode detected: \(payloadString) - Type: \(firstBarcode.symbology.rawValue)")
-            
-            // Create result dictionary
-            let result = self.createBarcodeResult(barcode: firstBarcode, payloadString: payloadString)
-            
-            // Capture callback safely
-            guard let callback = self.scanCallback else {
-                print("⚠️ No callback available")
-                return
-            }
-            
-            // Call the callback on main thread
-            DispatchQueue.main.async {
-                if self.isScanning {
-                    callback(result)
+
+            let imageRequestHandler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+
+            let barcodeRequest = VNDetectBarcodesRequest { [weak self] request, error in
+                guard let self = self else { return }
+
+                Task {
+                    // Double-check isScanning inside async callback
+                    let stillScanning = await self.sessionActor.getScanningState()
+                    guard stillScanning else { return }
+
+                    if let error = error {
+                        print("Barcode detection error: \(error.localizedDescription)")
+                        return
+                    }
+
+                    guard let results = request.results as? [VNBarcodeObservation],
+                        let firstBarcode = results.first,
+                        let payloadString = firstBarcode.payloadStringValue
+                    else {
+                        return
+                    }
+
+                    // Create result dictionary
+                    let result = self.createBarcodeResult(
+                        barcode: firstBarcode, payloadString: payloadString)
+
+                    // Invoke callback through the actor for thread safety
+                    await self.callbackActor.invokeCallback(with: result)
                     print("📤 Callback invoked with barcode data")
-                } else {
-                    print("⚠️ Scanning stopped before callback, ignoring")
                 }
             }
-        }
-        
-        barcodeRequest.symbologies = supportedBarcodeTypes
-        
-        do {
-            try imageRequestHandler.perform([barcodeRequest])
-        } catch {
-            print("Failed to perform barcode detection: \(error.localizedDescription)")
+
+            barcodeRequest.symbologies = supportedBarcodeTypes
+
+            do {
+                try imageRequestHandler.perform([barcodeRequest])
+            } catch {
+                print("Failed to perform barcode detection: \(error.localizedDescription)")
+            }
         }
     }
-    
-    private func createBarcodeResult(barcode: VNBarcodeObservation, payloadString: String) -> [String: Any] {
+
+    private func createBarcodeResult(barcode: VNBarcodeObservation, payloadString: String)
+        -> [String: Any]
+    {
         var result: [String: Any] = [
             "data": payloadString,
-            "type": getBarcodeTypeName(barcode.symbology)
+            "type": getBarcodeTypeName(barcode.symbology),
         ]
-        
+
         // Add bounds if available
         let boundingBox = barcode.boundingBox
         let bounds: [String: Any] = [
@@ -428,15 +607,15 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
                 "topLeft": ["x": boundingBox.minX, "y": boundingBox.maxY],
                 "bottomLeft": ["x": boundingBox.minX, "y": boundingBox.minY],
                 "bottomRight": ["x": boundingBox.maxX, "y": boundingBox.minY],
-                "topRight": ["x": boundingBox.maxX, "y": boundingBox.maxY]
-            ]
+                "topRight": ["x": boundingBox.maxX, "y": boundingBox.maxY],
+            ],
         ]
-        
+
         result["bounds"] = bounds
-        
+
         return result
     }
-    
+
     private func getBarcodeTypeName(_ symbology: VNBarcodeSymbology) -> String {
         switch symbology {
         case .qr:
@@ -468,4 +647,3 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
     }
 }
-

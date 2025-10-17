@@ -22,21 +22,38 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class CameraManager(private val reactContext: ReactApplicationContext) {
 
     private val TAG = "CameraManager"
+    @Volatile
     private var cameraProvider: ProcessCameraProvider? = null
-    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    @Volatile
+    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var scanner: BarcodeScanner? = null
+    @Volatile
     private var cameraControl: CameraControl? = null
     private var imageAnalysis: ImageAnalysis? = null
     private var preview: Preview? = null
     private var previewView: PreviewView? = null
     
+    // AtomicBoolean for lock-free scanning flag
+    private val isScanning = AtomicBoolean(false)
+    // AtomicReference for thread-safe callback
+    private val scanCallbackRef = AtomicReference<((WritableMap) -> Unit)?>(null)
+    
+    // Lock for synchronizing camera binding operations
+    private val cameraBindLock = ReentrantLock()
+    // Flag to prevent concurrent binding
     @Volatile
-    private var isScanning: Boolean = false
-    private var scanCallback: ((WritableMap) -> Unit)? = null
+    private var isBinding = false
+    // Lock for executor lifecycle management
+    private val executorLock = ReentrantLock()
 
     companion object {
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
@@ -50,25 +67,69 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
 
     fun bindPreviewView(view: PreviewView) {
         this.previewView = view
-        if (isScanning) {
-            // If already scanning, rebind with preview
-            bindCameraUseCases()
+        // Only rebind if scanning AND not already in binding process
+        if (isScanning.get() && !isBinding) {
+            // Schedule rebind on main executor to avoid race with initializeCamera callback
+            ContextCompat.getMainExecutor(reactContext).execute {
+                bindCameraUseCases()
+            }
         }
     }
 
-    @Synchronized
+    /**
+     * Thread-safe executor lifecycle management
+     * Ensures the camera executor is available and not shutdown.
+     * Creates a new executor if the current one has been shutdown.
+     * Uses dedicated lock to prevent race with releaseCamera()
+     */
+    private fun ensureExecutor() {
+        executorLock.withLock {
+            if (cameraExecutor.isShutdown) {
+                cameraExecutor = Executors.newSingleThreadExecutor()
+                Log.d(TAG, "♻️ Recreated camera executor")
+            }
+        }
+    }
+    
+    /**
+     * Safe executor access with validation
+     * Returns the executor only if it's not shutdown
+     */
+    private fun getExecutorSafely(): ExecutorService? {
+        return executorLock.withLock {
+            if (!cameraExecutor.isShutdown) cameraExecutor else null
+        }
+    }
+
+    /**
+     * Lock-free scanning with atomic CAS operation
+     * Eliminates race condition between check and set
+     */
     fun startScanning(callback: (WritableMap) -> Unit) {
         if (!hasCameraPermission()) {
             throw SecurityException("Camera permission not granted")
         }
 
-        if (isScanning) {
-            Log.w(TAG, "Scanning already in progress")
+        // Atomic compare-and-set: only first caller proceeds
+        if (!isScanning.compareAndSet(false, true)) {
+            Log.w(TAG, "Scanning already in progress, updating callback")
+            scanCallbackRef.set(callback)
             return
         }
 
-        scanCallback = callback
-        initializeCamera()
+        // At this point, we're guaranteed to be the only thread starting scanning
+        // Set callback immediately after winning the CAS race
+        scanCallbackRef.set(callback)
+        
+        try {
+            ensureExecutor()
+            initializeCamera()
+        } catch (e: Exception) {
+            // Reset flag on error
+            isScanning.set(false)
+            scanCallbackRef.set(null)
+            throw e
+        }
     }
 
     private fun initializeCamera() {
@@ -105,20 +166,47 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                 bindCameraUseCases()
             } catch (exc: Exception) {
                 Log.e(TAG, "Error initializing camera: ${exc.message}", exc)
-                isScanning = false
+                // Reset state on error
+                isScanning.set(false)
+                scanCallbackRef.set(null)
             }
         }, ContextCompat.getMainExecutor(reactContext))
     }
 
+    /**
+     * Thread-safe camera binding with lock
+     * Prevents concurrent binding operations that could cause IllegalStateException
+     */
     private fun bindCameraUseCases() {
-        Log.d(TAG, "Binding camera use cases...")
-        val currentActivity = reactContext.currentActivity as? AppCompatActivity
-        if (currentActivity == null) {
-            Log.e(TAG, "❌ Current activity is not available")
-            return
+        // Use lock to serialize all binding operations
+        cameraBindLock.withLock {
+            // Check and set binding flag atomically within lock
+            if (isBinding) {
+                Log.w(TAG, "⚠️ Camera binding already in progress, skipping")
+                return
+            }
+            isBinding = true
         }
-
+        
         try {
+            Log.d(TAG, "Binding camera use cases...")
+            val currentActivity = reactContext.currentActivity as? AppCompatActivity
+            if (currentActivity == null || currentActivity.isDestroyed || currentActivity.isFinishing) {
+                Log.e(TAG, "❌ Current activity is not available")
+                isScanning.set(false)
+                scanCallbackRef.set(null)
+                return
+            }
+
+            // Get executor safely - may be null if shutdown in progress
+            val executor = getExecutorSafely()
+            if (executor == null) {
+                Log.e(TAG, "❌ Executor is shutdown, cannot bind camera")
+                isScanning.set(false)
+                scanCallbackRef.set(null)
+                return
+            }
+
             // Unbind any existing use cases first
             cameraProvider?.unbindAll()
             Log.d(TAG, "Unbound previous camera use cases")
@@ -134,12 +222,14 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                     }
                 }
 
+            // Use the safely-obtained executor reference
             imageAnalysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->
-                    analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                        if (!isScanning) {
+                    analysis.setAnalyzer(executor) { imageProxy ->
+                        // Check atomic boolean
+                        if (!isScanning.get()) {
                             imageProxy.close()
                             return@setAnalyzer
                         }
@@ -164,11 +254,17 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             )
             
             cameraControl = camera?.cameraControl
-            isScanning = true
-            Log.d(TAG, "Camera successfully bound and scanning started (preview: ${preview != null})")
+            Log.d(TAG, "✅ Camera successfully bound and scanning started (preview: ${preview != null})")
         } catch (exc: Exception) {
             Log.e(TAG, "Error binding camera use cases: ${exc.message}", exc)
-            isScanning = false
+            // Reset state on binding error
+            isScanning.set(false)
+            scanCallbackRef.set(null)
+        } finally {
+            // Always reset binding flag in finally block
+            cameraBindLock.withLock {
+                isBinding = false
+            }
         }
     }
 
@@ -189,7 +285,8 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                 for (barcode in barcodes) {
                     if (!barcode.rawValue.isNullOrEmpty()) {
                         val result = createBarcodeResult(barcode)
-                        scanCallback?.invoke(result)
+                        val callback = scanCallbackRef.get()
+                        callback?.invoke(result)
                         break // Process only the first barcode
                     }
                 }
@@ -251,33 +348,46 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
         }
     }
 
-    @Synchronized
+    /**
+     * Uses atomic operation to stop scanning
+     * Thread-safe: Can be called from any thread, camera operations executed on main thread
+     */
     fun stopScanning() {
-        if (!isScanning) {
+        // Atomic CAS: only proceed if actually scanning
+        if (!isScanning.compareAndSet(true, false)) {
             Log.w(TAG, "Scanning is not in progress")
             return
         }
 
         try {
             Log.d(TAG, "Stopping scanning...")
-            isScanning = false
-            scanCallback = null
+            scanCallbackRef.set(null)
             
-            // Clear the analyzer to stop processing frames
-            imageAnalysis?.clearAnalyzer()
-            
-            // Unbind all use cases from the camera
-            cameraProvider?.unbindAll()
-            
-            // Clear references but don't shut down executor or scanner
-            // so they can be reused if scanning starts again
-            cameraControl = null
-            imageAnalysis = null
-            preview = null
-            
-            Log.d(TAG, "✅ Scanning stopped successfully")
+            // Execute camera operations on main thread to avoid IllegalStateException
+            ContextCompat.getMainExecutor(reactContext).execute {
+                try {
+                    // Clear the analyzer to stop processing frames
+                    imageAnalysis?.clearAnalyzer()
+                    
+                    // Unbind all use cases from the camera
+                    cameraProvider?.unbindAll()
+                    
+                    // Clear references but DON'T shutdown executor or scanner
+                    // They will be reused if scanning starts again
+                    cameraControl = null
+                    imageAnalysis = null
+                    preview = null
+                    
+                    Log.d(TAG, "✅ Scanning stopped successfully (executor kept alive for reuse)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error stopping scanning on main thread: ${e.message}", e)
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping scanning: ${e.message}", e)
+            // Ensure flag is still set to false even on error
+            isScanning.set(false)
+            throw e
         }
     }
 
@@ -305,29 +415,63 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
         try {
             Log.d(TAG, "Releasing camera resources...")
             
-            // Stop scanning first
-            if (isScanning) {
-                stopScanning()
+            // Stop scanning first using atomic operation
+            if (isScanning.compareAndSet(true, false)) {
+                scanCallbackRef.set(null)
+            }
+
+            // Wait for binding to complete WITHOUT holding the lock
+            // This prevents deadlock when startScanning() is called during release
+            var attempts = 0
+            while (isBinding && attempts < 100) { // Max wait: 5 seconds
+                Log.d(TAG, "⏳ Waiting for camera binding to complete before release...")
+                Thread.sleep(50)
+                attempts++
             }
             
-            // Unbind all camera use cases
-            cameraProvider?.unbindAll()
-            
+            if (isBinding) {
+                Log.w(TAG, "⚠️ Binding still in progress after 5s, forcing release")
+            }
+
+            // Now safely unbind with lock (binding should be complete)
+            cameraBindLock.withLock {
+                // Double-check binding state and unbind
+                if (isBinding) {
+                    Log.w(TAG, "⚠️ Binding flag still set, unbinding anyway")
+                }
+                cameraProvider?.unbindAll()
+            }
+        
             // Clear all references
             cameraProvider = null
             cameraControl = null
             imageAnalysis = null
             preview = null
             previewView = null
-            scanCallback = null
-            
+            scanCallbackRef.set(null)
+        
             // Close the barcode scanner
             scanner?.close()
             scanner = null
-            
-            // Note: We don't shutdown cameraExecutor here because it's a singleton
-            // and we want to reuse it if scanning starts again
-            
+        
+            // Use dedicated executor lock for shutdown
+            // This prevents race with ensureExecutor() and getExecutorSafely()
+            executorLock.withLock {
+                if (!cameraExecutor.isShutdown) {
+                    cameraExecutor.shutdown()
+                    try {
+                        if (!cameraExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                            cameraExecutor.shutdownNow()
+                            Log.w(TAG, "⚠️ Executor did not terminate gracefully, forced shutdown")
+                        }
+                    } catch (e: InterruptedException) {
+                        cameraExecutor.shutdownNow()
+                        Thread.currentThread().interrupt()
+                        Log.w(TAG, "⚠️ Executor shutdown interrupted")
+                    }
+                }
+            }
+        
             Log.d(TAG, "✅ Camera resources released successfully")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error releasing camera: ${e.message}", e)

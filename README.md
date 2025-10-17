@@ -226,17 +226,17 @@ await BarcodeScanner.releaseCamera();
 
 ---
 
-#### `setFlash(enabled)`
+#### `enableFlashlight()` / `disableFlashlight()`
 
-Toggles the camera flash on/off.
+Control the camera flashlight (torch) explicitly.
 
 ```typescript
-await BarcodeScanner.setFlash(true);  // Turn on
-await BarcodeScanner.setFlash(false); // Turn off
-```
+// Turn flashlight on
+await BarcodeScanner.enableFlashlight();
 
-**Parameters:**
-- `enabled: boolean` - Enable or disable flash
+// Turn flashlight off
+await BarcodeScanner.disableFlashlight();
+```
 
 **Returns:** `Promise<void>`
 
@@ -317,9 +317,17 @@ import { BarcodeScanner } from '@pushpendersingh/react-native-scanner';
 const [flashEnabled, setFlashEnabled] = useState(false);
 
 const toggleFlash = async () => {
-  const newState = !flashEnabled;
-  await BarcodeScanner.setFlash(newState);
-  setFlashEnabled(newState);
+  try {
+    if (flashEnabled) {
+      await BarcodeScanner.disableFlashlight();
+      setFlashEnabled(false);
+    } else {
+      await BarcodeScanner.enableFlashlight();
+      setFlashEnabled(true);
+    }
+  } catch (err) {
+    console.error('Failed to toggle flashlight', err);
+  }
 };
 ```
 
@@ -558,15 +566,6 @@ This library supports a wide range of barcode formats across different categorie
 - Check that barcode format is supported
 - Verify barcode is not damaged or distorted
 
-### IMEI/IMEI2 Scanning
-
-**✅ Fixed:** Previously, the scanner could detect EID and MEID but had issues scanning IMEI and IMEI2 numbers. This has been resolved in the current version.
-
-**How it works:**
-- IMEI and IMEI2 are typically encoded as **CODE_128** or **CODE_39** barcodes
-- The scanner now properly detects and decodes these formats
-- Both IMEI (15 digits) and IMEI2 (dual SIM devices) are fully supported
-
 **Tips for scanning IMEI:**
 - Ensure the IMEI barcode is clean and undamaged
 - Use good lighting (enable flashlight if needed)
@@ -609,10 +608,6 @@ cd example && yarn android
 ## 🚀 Roadmap & Future Improvements
 
 We're constantly working to improve this library. Here are some planned enhancements:
-
-### Recently Completed ✅
-
-- [x] **Enhanced Permission Handling** - ✅ Implemented proper native permission callback mechanism for `requestCameraPermission()` method with promise resolution based on user response (iOS & Android API 23+)
 
 ### Planned Features
 

@@ -12,6 +12,7 @@ class ReactNativeScannerView(context: Context) : FrameLayout(context) {
 
     private val previewView: PreviewView
     private var cameraManager: CameraManager? = null
+    private var layoutCallback: Choreographer.FrameCallback? = null
 
     init {
         // Create PreviewView
@@ -30,13 +31,21 @@ class ReactNativeScannerView(context: Context) : FrameLayout(context) {
     }
 
     private fun setupLayoutHack() {
-        Choreographer.getInstance().postFrameCallback(object : Choreographer.FrameCallback {
+        layoutCallback = object : Choreographer.FrameCallback {
             override fun doFrame(frameTimeNanos: Long) {
                 manuallyLayoutChildren()
                 viewTreeObserver.dispatchOnGlobalLayout()
                 Choreographer.getInstance().postFrameCallback(this)
             }
-        })
+        }
+        layoutCallback?.let { Choreographer.getInstance().postFrameCallback(it) }
+    }
+    
+    private fun removeLayoutCallback() {
+        layoutCallback?.let {
+            Choreographer.getInstance().removeFrameCallback(it)
+            layoutCallback = null
+        }
     }
 
     private fun manuallyLayoutChildren() {
@@ -59,9 +68,17 @@ class ReactNativeScannerView(context: Context) : FrameLayout(context) {
         // Bind the preview view to the camera manager
         manager.bindPreviewView(previewView)
     }
+    
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // Restart layout callback when view is reattached
+        setupLayoutHack()
+    }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        // Remove Choreographer callback to prevent memory leak
+        removeLayoutCallback()
         // Clean up camera when view is detached
         cameraManager?.releaseCamera()
     }

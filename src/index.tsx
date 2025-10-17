@@ -1,28 +1,4 @@
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import NativeReactNativeScanner from './NativeReactNativeScanner';
-
-// Augment global type for TurboModule detection
-declare global {
-  // eslint-disable-next-line no-var
-  var __turboModuleProxy: any | undefined;
-}
-
-const LINKING_ERROR =
-  `The package '@pushpendersingh/react-native-scanner' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({ ios: "- Run 'pod install'\n", default: '' }) +
-  '- Rebuild the app';
-
-const isTurboModuleEnabled = global.__turboModuleProxy != null;
-
-const ReactNativeScannerModule = isTurboModuleEnabled
-  ? NativeReactNativeScanner
-  : NativeModules.ReactNativeScanner;
-
-if (!ReactNativeScannerModule) {
-  throw new Error(LINKING_ERROR);
-}
-
-const eventEmitter = new NativeEventEmitter(ReactNativeScannerModule);
 
 // Types
 export type BarcodeType =
@@ -62,88 +38,51 @@ export type BarcodeScannerCallback = (result: BarcodeResult) => void;
 export class BarcodeScanner {
   private static listener: any = null;
 
-  /**
-   * Start scanning for barcodes
-   * @param callback Function to call when a barcode is detected
-   * @returns Promise that resolves when scanning starts
-   */
   static async startScanning(callback: BarcodeScannerCallback): Promise<void> {
-    // Remove any existing listener first
+    // Remove existing listener
     if (this.listener) {
       this.listener.remove();
       this.listener = null;
     }
 
-    // Add new listener BEFORE starting scanning
-    this.listener = eventEmitter.addListener(
-      'onBarcodeScanned',
-      (result: any) => {
-        console.log('📱 Event received in JS:', result);
-        callback(result as BarcodeResult);
-      }
-    );
-
-    // Small delay to ensure listener is fully registered
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    this.listener = NativeReactNativeScanner.onBarcodeScanned((event) => {
+      callback(event as BarcodeResult);
+    });
 
     // Start scanning
-    return ReactNativeScannerModule.startScanning();
+    return NativeReactNativeScanner.startScanning();
   }
 
-  /**
-   * Stop scanning for barcodes
-   * @returns Promise that resolves when scanning stops
-   */
   static async stopScanning(): Promise<void> {
     if (this.listener) {
       this.listener.remove();
       this.listener = null;
     }
-    return ReactNativeScannerModule.stopScanning();
+    return NativeReactNativeScanner.stopScanning();
   }
 
-  /**
-   * Enable device flashlight/torch
-   * @returns Promise that resolves when flashlight is enabled
-   */
   static async enableFlashlight(): Promise<void> {
-    return ReactNativeScannerModule.enableFlashlight();
+    return NativeReactNativeScanner.enableFlashlight();
   }
 
-  /**
-   * Disable device flashlight/torch
-   * @returns Promise that resolves when flashlight is disabled
-   */
   static async disableFlashlight(): Promise<void> {
-    return ReactNativeScannerModule.disableFlashlight();
+    return NativeReactNativeScanner.disableFlashlight();
   }
 
-  /**
-   * Release camera resources
-   * @returns Promise that resolves when camera is released
-   */
   static async releaseCamera(): Promise<void> {
     if (this.listener) {
       this.listener.remove();
       this.listener = null;
     }
-    return ReactNativeScannerModule.releaseCamera();
+    return NativeReactNativeScanner.releaseCamera();
   }
 
-  /**
-   * Check if camera permission is granted
-   * @returns Promise that resolves with permission status
-   */
   static async hasCameraPermission(): Promise<boolean> {
-    return ReactNativeScannerModule.hasCameraPermission();
+    return NativeReactNativeScanner.hasCameraPermission();
   }
 
-  /**
-   * Request camera permission
-   * @returns Promise that resolves with whether permission was granted
-   */
   static async requestCameraPermission(): Promise<boolean> {
-    return ReactNativeScannerModule.requestCameraPermission();
+    return NativeReactNativeScanner.requestCameraPermission();
   }
 }
 

@@ -44,7 +44,8 @@ public class CameraView: UIView {
         // keeping UI work on main and avoiding concurrency violations.
         manager.onSessionReady = { [weak self] session in
             guard let self = self else { return }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
                 if let previewLayer = self.previewLayer {
                     previewLayer.session = session
                     previewLayer.connection?.videoOrientation = .portrait
@@ -55,11 +56,11 @@ public class CameraView: UIView {
             }
         }
         
-        // CHANGE: If a session already exists, bind it immediately on the main thread.
-        // Reason: Ensures the preview shows even if the session was created before the view.
-        if let existingSession = manager.currentSession() {
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self, let previewLayer = self.previewLayer else { return }
+        // Use non-blocking callback version
+        // Reason: Avoids blocking main thread with semaphore
+        manager.getCurrentSession { [weak self] existingSession in
+            guard let self = self, let previewLayer = self.previewLayer else { return }
+            if let existingSession = existingSession {
                 previewLayer.session = existingSession
                 previewLayer.connection?.videoOrientation = .portrait
                 print("✅ Preview layer bound to existing session")
@@ -79,6 +80,12 @@ public class CameraView: UIView {
         previewLayer?.session = nil
         previewLayer?.removeFromSuperlayer()
         previewLayer = nil
+        
+        // Clear the onSessionReady callback to prevent potential retain cycles
+        cameraManager?.onSessionReady = nil
+        cameraManager = nil
+        
+        print("🗑️ CameraView deallocated")
     }
 }
 

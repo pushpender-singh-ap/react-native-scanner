@@ -73,6 +73,8 @@ class ReactNativeScannerView(context: Context) : FrameLayout(context) {
         super.onAttachedToWindow()
         // Restart layout callback when view is reattached
         setupLayoutHack()
+        // Rebind the preview view to camera manager when reattached
+        cameraManager?.bindPreviewView(previewView)
     }
 
     override fun onDetachedFromWindow() {

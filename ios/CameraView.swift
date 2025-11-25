@@ -13,15 +13,18 @@ public class CameraView: UIView {
     
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var cameraManager: CameraManager?
+    private var currentVideoOrientation: AVCaptureVideoOrientation = .portrait
     
     public override init(frame: CGRect) {
         super.init(frame: frame)
         setupView()
+        setupOrientationObserver()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupView()
+        setupOrientationObserver()
     }
     
     private func setupView() {
@@ -34,6 +37,19 @@ public class CameraView: UIView {
             previewLayer.frame = bounds
             layer.addSublayer(previewLayer)
         }
+    }
+    
+    private func setupOrientationObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOrientationChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleOrientationChange() {
+        updateVideoOrientation()
     }
     
     @objc public func setCameraManager(_ manager: CameraManager) {
@@ -73,7 +89,6 @@ public class CameraView: UIView {
     public override func layoutSubviews() {
         super.layoutSubviews()
         previewLayer?.frame = bounds
-        updateVideoOrientation()
     }
 
     private func updateVideoOrientation() {
@@ -113,10 +128,17 @@ public class CameraView: UIView {
             }
         }
         
+        // Only update if orientation actually changed
+        guard videoOrientation != currentVideoOrientation else { return }
+        
+        currentVideoOrientation = videoOrientation
         connection.videoOrientation = videoOrientation
     }
     
     deinit {
+        // Remove orientation observer
+        NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+        
         // CHANGE: Clear session on teardown to avoid retaining references.
         previewLayer?.session = nil
         previewLayer?.removeFromSuperlayer()

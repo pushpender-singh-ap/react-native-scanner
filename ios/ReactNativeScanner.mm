@@ -32,7 +32,7 @@
   NSError *error = nil;
   @try {
     [_cameraManager
-        startScanningWithCallback:^(NSDictionary *result) {
+        startScanningWithCallback:^(NSArray *result) {
           [self emitOnBarcodeScanned:result];
         }
                             error:&error];

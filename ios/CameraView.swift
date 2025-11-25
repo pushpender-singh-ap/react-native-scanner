@@ -79,20 +79,41 @@ public class CameraView: UIView {
     private func updateVideoOrientation() {
         guard let connection = previewLayer?.connection, connection.isVideoOrientationSupported else { return }
         
-        let orientation = UIDevice.current.orientation
+        let deviceOrientation = UIDevice.current.orientation
         
-        switch orientation {
+        let videoOrientation: AVCaptureVideoOrientation
+        
+        switch deviceOrientation {
         case .portrait:
-            connection.videoOrientation = .portrait
+            videoOrientation = .portrait
         case .landscapeRight:
-            connection.videoOrientation = .landscapeLeft
+            videoOrientation = .landscapeLeft
         case .landscapeLeft:
-            connection.videoOrientation = .landscapeRight
+            videoOrientation = .landscapeRight
         case .portraitUpsideDown:
-            connection.videoOrientation = .portraitUpsideDown
+            videoOrientation = .portraitUpsideDown
         default:
-            break
+            // For .faceUp, .faceDown, .unknown, or during transitions,
+            // fall back to the interface orientation from the window scene
+            if let windowScene = window?.windowScene {
+                switch windowScene.interfaceOrientation {
+                case .portrait:
+                    videoOrientation = .portrait
+                case .landscapeRight:
+                    videoOrientation = .landscapeRight
+                case .landscapeLeft:
+                    videoOrientation = .landscapeLeft
+                case .portraitUpsideDown:
+                    videoOrientation = .portraitUpsideDown
+                default:
+                    videoOrientation = .portrait
+                }
+            } else {
+                videoOrientation = .portrait
+            }
         }
+        
+        connection.videoOrientation = videoOrientation
     }
     
     deinit {

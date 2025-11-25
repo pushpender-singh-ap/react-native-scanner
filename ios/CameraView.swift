@@ -13,15 +13,18 @@ public class CameraView: UIView {
     
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var cameraManager: CameraManager?
+    private var currentVideoOrientation: AVCaptureVideoOrientation = .portrait
     
     public override init(frame: CGRect) {
         super.init(frame: frame)
         setupView()
+        setupOrientationObserver()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupView()
+        setupOrientationObserver()
     }
     
     private func setupView() {
@@ -36,6 +39,22 @@ public class CameraView: UIView {
         }
     }
     
+    private func setupOrientationObserver() {
+        // Enable device orientation notifications
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOrientationChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleOrientationChange() {
+        updateVideoOrientation()
+    }
+    
     @objc public func setCameraManager(_ manager: CameraManager) {
         self.cameraManager = manager
         
@@ -48,7 +67,7 @@ public class CameraView: UIView {
                 guard let self = self else { return }
                 if let previewLayer = self.previewLayer {
                     previewLayer.session = session
-                    previewLayer.connection?.videoOrientation = .portrait
+                    self.updateVideoOrientation()
                     print("✅ Preview layer bound to session from onSessionReady callback")
                 } else {
                     print("⚠️ Preview layer missing when session became ready")
@@ -62,7 +81,7 @@ public class CameraView: UIView {
             guard let self = self, let previewLayer = self.previewLayer else { return }
             if let existingSession = existingSession {
                 previewLayer.session = existingSession
-                previewLayer.connection?.videoOrientation = .portrait
+                self.updateVideoOrientation()
                 print("✅ Preview layer bound to existing session")
             }
         }
@@ -74,8 +93,56 @@ public class CameraView: UIView {
         super.layoutSubviews()
         previewLayer?.frame = bounds
     }
+
+    private func updateVideoOrientation() {
+        guard let connection = previewLayer?.connection, connection.isVideoOrientationSupported else { return }
+        
+        let deviceOrientation = UIDevice.current.orientation
+        
+        let videoOrientation: AVCaptureVideoOrientation
+        
+        switch deviceOrientation {
+        case .portrait:
+            videoOrientation = .portrait
+        case .landscapeRight:
+            videoOrientation = .landscapeLeft
+        case .landscapeLeft:
+            videoOrientation = .landscapeRight
+        case .portraitUpsideDown:
+            videoOrientation = .portraitUpsideDown
+        default:
+            // For .faceUp, .faceDown, .unknown, or during transitions,
+            // fall back to the interface orientation from the window scene
+            if let windowScene = window?.windowScene {
+                switch windowScene.interfaceOrientation {
+                case .portrait:
+                    videoOrientation = .portrait
+                case .landscapeRight:
+                    videoOrientation = .landscapeRight
+                case .landscapeLeft:
+                    videoOrientation = .landscapeLeft
+                case .portraitUpsideDown:
+                    videoOrientation = .portraitUpsideDown
+                default:
+                    videoOrientation = .portrait
+                }
+            } else {
+                videoOrientation = .portrait
+            }
+        }
+        
+        // Only update if orientation actually changed
+        guard videoOrientation != currentVideoOrientation else { return }
+        
+        currentVideoOrientation = videoOrientation
+        connection.videoOrientation = videoOrientation
+    }
     
     deinit {
+        // Remove orientation observer and stop generating notifications
+        NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        
         // CHANGE: Clear session on teardown to avoid retaining references.
         previewLayer?.session = nil
         previewLayer?.removeFromSuperlayer()

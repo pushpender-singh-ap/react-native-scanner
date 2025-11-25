@@ -48,7 +48,7 @@ public class CameraView: UIView {
                 guard let self = self else { return }
                 if let previewLayer = self.previewLayer {
                     previewLayer.session = session
-                    previewLayer.connection?.videoOrientation = .portrait
+                    self.updateVideoOrientation()
                     print("✅ Preview layer bound to session from onSessionReady callback")
                 } else {
                     print("⚠️ Preview layer missing when session became ready")
@@ -62,7 +62,7 @@ public class CameraView: UIView {
             guard let self = self, let previewLayer = self.previewLayer else { return }
             if let existingSession = existingSession {
                 previewLayer.session = existingSession
-                previewLayer.connection?.videoOrientation = .portrait
+                self.updateVideoOrientation()
                 print("✅ Preview layer bound to existing session")
             }
         }
@@ -73,6 +73,26 @@ public class CameraView: UIView {
     public override func layoutSubviews() {
         super.layoutSubviews()
         previewLayer?.frame = bounds
+        updateVideoOrientation()
+    }
+
+    private func updateVideoOrientation() {
+        guard let connection = previewLayer?.connection, connection.isVideoOrientationSupported else { return }
+        
+        let orientation = UIDevice.current.orientation
+        
+        switch orientation {
+        case .portrait:
+            connection.videoOrientation = .portrait
+        case .landscapeRight:
+            connection.videoOrientation = .landscapeLeft
+        case .landscapeLeft:
+            connection.videoOrientation = .landscapeRight
+        case .portraitUpsideDown:
+            connection.videoOrientation = .portraitUpsideDown
+        default:
+            break
+        }
     }
     
     deinit {

@@ -66,17 +66,17 @@ actor CameraSessionActor {
 
 // Actor that manages scan callbacks thread-safely
 actor CallbackActor {
-    private var scanCallback: (([String: Any]) -> Void)?
+    private var scanCallback: (([[String: Any]]) -> Void)?
     
-    func setCallback(_ callback: (([String: Any]) -> Void)?) {
+    func setCallback(_ callback: (([[String: Any]]) -> Void)?) {
         scanCallback = callback
     }
     
-    func getCallback() -> (([String: Any]) -> Void)? {
+    func getCallback() -> (([[String: Any]]) -> Void)? {
         return scanCallback
     }
     
-    func invokeCallback(with result: [String: Any]) {
+    func invokeCallback(with result: [[String: Any]]) {
         if let callback = scanCallback {
             Task { @MainActor in
                 callback(result)
@@ -141,7 +141,7 @@ actor CallbackActor {
     }
 
     @objc(startScanningWithCallback:error:)
-    public func startScanning(callback: @escaping ([String: Any]) -> Void) throws {
+    public func startScanning(callback: @escaping ([[String: Any]]) -> Void) throws {
         // Check permission status immediately, but asynchronously request if needed.
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
@@ -162,7 +162,7 @@ actor CallbackActor {
                             await self.configureAndStartScanning(callback: callback)
                         } else {
                             // Handle denial.
-                            let errorInfo = ["error": "Camera permission denied"]
+                            let errorInfo = [["error": "Camera permission denied"]]
                             await self.callbackActor.invokeCallback(with: errorInfo)
                         }
                     }
@@ -170,13 +170,13 @@ actor CallbackActor {
             }
         case .denied, .restricted:
             // Handle denied/restricted status immediately.
-            let errorInfo = ["error": "Camera permission not granted"]
+            let errorInfo = [["error": "Camera permission not granted"]]
             Task {
                 await callbackActor.invokeCallback(with: errorInfo)
             }
         @unknown default:
             // Handle any future unknown cases.
-            let errorInfo = ["error": "Unknown camera permission status"]
+            let errorInfo = [["error": "Unknown camera permission status"]]
             Task {
                 await callbackActor.invokeCallback(with: errorInfo)
             }
@@ -185,7 +185,7 @@ actor CallbackActor {
 
     // Private helper with atomic check-and-set
     // Eliminates race condition in session initialization
-    private func configureAndStartScanning(callback: @escaping ([String: Any]) -> Void) async {
+    private func configureAndStartScanning(callback: @escaping ([[String: Any]]) -> Void) async {
         // Atomic operation - no race condition
         guard await sessionActor.startScanningIfNotActive() else {
             print("⚠️ Session already running, updating callback only")
@@ -563,20 +563,25 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
                         return
                     }
 
-                    guard let results = request.results as? [VNBarcodeObservation],
-                        let firstBarcode = results.first,
-                        let payloadString = firstBarcode.payloadStringValue
-                    else {
+                    guard let results = request.results as? [VNBarcodeObservation], !results.isEmpty else {
                         return
                     }
 
-                    // Create result dictionary
-                    let result = self.createBarcodeResult(
-                        barcode: firstBarcode, payloadString: payloadString)
-
-                    // Invoke callback through the actor for thread safety
-                    await self.callbackActor.invokeCallback(with: result)
-                    print("📤 Callback invoked with barcode data")
+                    var barcodeResults: [[String: Any]] = []
+                    
+                    for barcode in results {
+                        if let payloadString = barcode.payloadStringValue {
+                            let result = self.createBarcodeResult(
+                                barcode: barcode, payloadString: payloadString)
+                            barcodeResults.append(result)
+                        }
+                    }
+                    
+                    if !barcodeResults.isEmpty {
+                        // Invoke callback through the actor for thread safety
+                        await self.callbackActor.invokeCallback(with: barcodeResults)
+                        print("📤 Callback invoked with \(barcodeResults.count) barcodes")
+                    }
                 }
             }
 

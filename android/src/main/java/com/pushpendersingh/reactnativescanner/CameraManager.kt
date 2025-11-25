@@ -15,6 +15,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -45,7 +46,7 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
     // AtomicBoolean for lock-free scanning flag
     private val isScanning = AtomicBoolean(false)
     // AtomicReference for thread-safe callback
-    private val scanCallbackRef = AtomicReference<((WritableMap) -> Unit)?>(null)
+    private val scanCallbackRef = AtomicReference<((WritableArray) -> Unit)?>(null)
     
     // Lock for synchronizing camera binding operations
     private val cameraBindLock = ReentrantLock()
@@ -105,7 +106,7 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
      * Lock-free scanning with atomic CAS operation
      * Eliminates race condition between check and set
      */
-    fun startScanning(callback: (WritableMap) -> Unit) {
+    fun startScanning(callback: (WritableArray) -> Unit) {
         if (!hasCameraPermission()) {
             throw SecurityException("Camera permission not granted")
         }
@@ -282,12 +283,21 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
 
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    if (!barcode.rawValue.isNullOrEmpty()) {
-                        val result = createBarcodeResult(barcode)
+                if (barcodes.isNotEmpty()) {
+                    val results = Arguments.createArray()
+                    var hasValidBarcode = false
+                    
+                    for (barcode in barcodes) {
+                        if (!barcode.rawValue.isNullOrEmpty()) {
+                            val result = createBarcodeResult(barcode)
+                            results.pushMap(result)
+                            hasValidBarcode = true
+                        }
+                    }
+                    
+                    if (hasValidBarcode) {
                         val callback = scanCallbackRef.get()
-                        callback?.invoke(result)
-                        break // Process only the first barcode
+                        callback?.invoke(results)
                     }
                 }
             }

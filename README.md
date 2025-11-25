@@ -96,9 +96,12 @@ export default function App() {
   const startScanning = async () => {
     try {
       setScanning(true);
-      await BarcodeScanner.startScanning((barcode) => {
-        console.log('Barcode detected:', barcode);
-        setResult(`${barcode.type}: ${barcode.data}`);
+      await BarcodeScanner.startScanning((barcodes) => {
+        console.log('Barcodes detected:', barcodes);
+        if (barcodes.length > 0) {
+          const barcode = barcodes[0];
+          setResult(`${barcode.type}: ${barcode.data}`);
+        }
         stopScanning();
       });
     } catch (error) {
@@ -188,15 +191,17 @@ const styles = StyleSheet.create({
 Starts the barcode scanning process.
 
 ```typescript
-BarcodeScanner.startScanning((barcode: BarcodeResult) => {
-  console.log('Type:', barcode.type);
-  console.log('Data:', barcode.data);
-  console.log('Raw:', barcode.raw);
+BarcodeScanner.startScanning((barcodes: BarcodeResult[]) => {
+  barcodes.forEach((barcode) => {
+    console.log('Type:', barcode.type);
+    console.log('Data:', barcode.data);
+    console.log('Raw:', barcode.raw);
+  });
 });
 ```
 
 **Parameters:**
-- `callback: (barcode: BarcodeResult) => void` - Called when a barcode is detected
+- `callback: (barcodes: BarcodeResult[]) => void` - Called when barcodes are detected
 
 **Returns:** `Promise<void>`
 
@@ -401,10 +406,8 @@ export default function App() {
       );
       return;
     }
-
-    setScanning(true);
-    await BarcodeScanner.startScanning((barcode) => {
-      console.log('Scanned:', barcode);
+    await BarcodeScanner.startScanning((barcodes) => {
+      console.log('Scanned:', barcodes);
       BarcodeScanner.stopScanning();
       setScanning(false);
     });

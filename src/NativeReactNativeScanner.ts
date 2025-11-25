@@ -1,7 +1,7 @@
 import type { CodegenTypes, TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
-export type BarcodeScannedEvent = {
+export type BarcodeResult = {
   data: string;
   type: string;
   bounds?: {
@@ -15,6 +15,8 @@ export type BarcodeScannedEvent = {
     };
   };
 };
+
+export type BarcodeScannedEvent = BarcodeResult[];
 
 export interface Spec extends TurboModule {
   // Start scanning - results will be emitted via events

@@ -32,7 +32,7 @@ export interface BarcodeResult {
   };
 }
 
-export type BarcodeScannerCallback = (result: BarcodeResult) => void;
+export type BarcodeScannerCallback = (results: BarcodeResult[]) => void;
 
 // Scanner API
 export class BarcodeScanner {
@@ -46,7 +46,7 @@ export class BarcodeScanner {
     }
 
     this.listener = NativeReactNativeScanner.onBarcodeScanned((event) => {
-      callback(event as BarcodeResult);
+      callback(event as unknown as BarcodeResult[]);
     });
 
     // Start scanning

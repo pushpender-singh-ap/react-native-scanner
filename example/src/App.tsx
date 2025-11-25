@@ -35,10 +35,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleBarcodeScanned = (result: BarcodeResult) => {
-    console.log('Barcode / QR Code scanned:', result.data, result.type);
-    setScannedData(result);
-    setScanHistory((prev) => [result, ...prev.slice(0, 9)]); // Keep last 10 scans
+  const handleBarcodeScanned = (results: BarcodeResult[]) => {
+    console.log('Barcode / QR Code scanned:', results);
+    if (results.length > 0) {
+      setScannedData(results[0] ?? null);
+      setScanHistory((prev) => [...results, ...prev].slice(0, 20)); // Keep last 20 scans
+    }
   };
 
   const startScanning = async () => {

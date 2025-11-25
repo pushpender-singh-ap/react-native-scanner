@@ -2340,7 +2340,7 @@ PODS:
     - React-perflogger (= 0.81.1)
     - React-utils (= 0.81.1)
     - SocketRocket
-  - ReactNativeScanner (1.9.0):
+  - ReactNativeScanner (2.0.1):
     - boost
     - DoubleConversion
     - fast_float
@@ -2704,7 +2704,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 3eb9096cb139eb433965693bbe541d96eb3d3ec9
   ReactCodegen: 4d203eddf6f977caa324640a20f92e70408d648b
   ReactCommon: ce5d4226dfaf9d5dacbef57b4528819e39d3a120
-  ReactNativeScanner: a12dcaf9a2b833163139c0372e17d819e60b7b99
+  ReactNativeScanner: df211791142d25d9f5a0cc56790172b0b81bb7ad
   RNPermissions: 380b0ddaff0bba3d4d0bbe4ed402044bc695752b
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 11c9686a21e2cd82a094a723649d9f4507200fb0

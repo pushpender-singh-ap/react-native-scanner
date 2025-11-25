@@ -1,6 +1,6 @@
 {
   "name": "@pushpendersingh/react-native-scanner",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "A QR code & Barcode Scanner for React Native Projects.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",

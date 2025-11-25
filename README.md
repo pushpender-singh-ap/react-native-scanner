@@ -5,7 +5,7 @@
 ![React Native](https://img.shields.io/badge/React%20Native-v0.80+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-lightgrey.svg)
-![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-3.0.0-brightgreen.svg)
 
 **A powerful, easy-to-use QR code & Barcode Scanner for React Native with New Architecture support**
 

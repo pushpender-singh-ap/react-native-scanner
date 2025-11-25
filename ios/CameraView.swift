@@ -40,6 +40,9 @@ public class CameraView: UIView {
     }
     
     private func setupOrientationObserver() {
+        // Enable device orientation notifications
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOrientationChange),
@@ -136,8 +139,9 @@ public class CameraView: UIView {
     }
     
     deinit {
-        // Remove orientation observer
+        // Remove orientation observer and stop generating notifications
         NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
         
         // CHANGE: Clear session on teardown to avoid retaining references.
         previewLayer?.session = nil

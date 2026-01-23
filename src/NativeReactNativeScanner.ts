@@ -40,6 +40,9 @@ export interface Spec extends TurboModule {
   // Request camera permission
   requestCameraPermission(): Promise<boolean>;
 
+  // Scan a static image
+  scanImage(imageUri: string): Promise<BarcodeScannedEvent>;
+
   readonly onBarcodeScanned: CodegenTypes.EventEmitter<BarcodeScannedEvent>;
 }
 

@@ -84,6 +84,12 @@ export class BarcodeScanner {
   static async requestCameraPermission(): Promise<boolean> {
     return NativeReactNativeScanner.requestCameraPermission();
   }
+
+  static async scanImage(imageUri: string): Promise<BarcodeResult[]> {
+    return NativeReactNativeScanner.scanImage(imageUri) as unknown as Promise<
+      BarcodeResult[]
+    >;
+  }
 }
 
 // Export camera view

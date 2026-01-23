@@ -62,11 +62,13 @@ yarn add @pushpendersingh/react-native-scanner
 cd ios && pod install && cd ..
 ```
 
-2. Add camera permission to `Info.plist`:
+1. Add camera permission to `Info.plist`:
 
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>We need camera access to scan barcodes</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>We need access to your photo library to scan barcodes from images</string>
 ```
 
 ### Android Setup
@@ -75,6 +77,8 @@ Add camera permission to `AndroidManifest.xml`:
 
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 <uses-feature android:name="android.hardware.camera" />
 ```
 
@@ -180,6 +184,35 @@ const styles = StyleSheet.create({
 });
 ```
 
+### Scanning from Image (Gallery)
+
+You can also scan QR codes and barcodes from existing images (e.g., from the gallery).
+
+```tsx
+import { launchImageLibrary } from 'react-native-image-picker';
+import { BarcodeScanner } from '@pushpendersingh/react-native-scanner';
+
+const scanFromGallery = async () => {
+  const result = await launchImageLibrary({ mediaType: 'photo' });
+  
+  if (result.assets && result.assets.length > 0) {
+    const imageUri = result.assets[0].uri;
+    if (imageUri) {
+      try {
+        const barcodes = await BarcodeScanner.scanImage(imageUri);
+        if (barcodes.length > 0) {
+          console.log('Found barcode:', barcodes[0].data);
+        } else {
+          console.log('No barcode found');
+        }
+      } catch (error) {
+        console.error('Scan failed:', error);
+      }
+    }
+  }
+};
+```
+
 ---
 
 ## 📚 API Reference
@@ -201,9 +234,40 @@ BarcodeScanner.startScanning((barcodes: BarcodeResult[]) => {
 ```
 
 **Parameters:**
+
 - `callback: (barcodes: BarcodeResult[]) => void` - Called when barcodes are detected
 
 **Returns:** `Promise<void>`
+
+---
+
+#### `scanImage(imageUri)`
+
+Scans a static image for barcodes. This is useful for scanning QR codes from gallery images, screenshots, or when live camera scanning fails on low-end devices.
+
+```typescript
+const barcodes = await BarcodeScanner.scanImage('file:///path/to/image.jpg');
+```
+
+**Parameters:**
+
+- `imageUri: string` - URI of the image file (supports `file://` and `content://` schemes)
+
+**Returns:** `Promise<BarcodeResult[]>` - Array of detected barcodes
+
+**Supported Image Formats:**
+
+| Format | Android | iOS | Notes |
+|--------|---------|-----|-------|
+| JPEG/JPG | ✅ | ✅ | Full support |
+| PNG | ✅ | ✅ | Transparency handled (white background) |
+| WebP | ✅ | ✅ | iOS 14+ only |
+| GIF | ⚠️ | ⚠️ | First frame only |
+| BMP | ✅ | ✅ | Full support |
+| HEIF/HEIC | ✅ | ✅ | Android 8.0+, iOS 11+ |
+| TIFF | ❌ | ✅ | iOS only |
+
+**Not Supported:** SVG, PDF, RAW (CR2, NEF, etc.), ICO, PSD
 
 ---
 
@@ -278,6 +342,7 @@ if (granted) {
 **Returns:** `Promise<boolean>` - `true` if user grants permission, `false` if denied
 
 **Platform Support:**
+
 - ✅ **iOS**: Fully supported with native callback
 - ✅ **Android**: Fully supported with native callback (API 23+)
 
@@ -294,6 +359,7 @@ React component that renders the camera preview.
 ```
 
 **Props:**
+
 - `style?: ViewStyle` - Style for the camera view container
 
 ---
@@ -439,6 +505,7 @@ export default function App() {
 ```
 
 **Key Features:**
+
 - ✅ **Cross-platform**: Works on both iOS (API 10+) and Android (API 23+)
 - ✅ **Promise-based**: Returns `true` when granted, `false` when denied
 - ✅ **Native callbacks**: Waits for actual user response from system dialog
@@ -502,6 +569,7 @@ const requestCameraPermission = async () => {
   return result === RESULTS.GRANTED;
 };
 ```
+
 ---
 
 ## 📋 Supported Barcode Formats
@@ -555,10 +623,12 @@ This library supports a wide range of barcode formats across different categorie
 ### Camera Preview Not Showing
 
 **iOS:**
+
 - Check camera permission in `Info.plist`
 - Ensure you're running on a physical device (simulator doesn't have camera)
 
 **Android:**
+
 - Check camera permission in `AndroidManifest.xml`
 - Verify Google Play Services is installed
 
@@ -570,6 +640,7 @@ This library supports a wide range of barcode formats across different categorie
 - Verify barcode is not damaged or distorted
 
 **Tips for scanning IMEI:**
+
 - Ensure the IMEI barcode is clean and undamaged
 - Use good lighting (enable flashlight if needed)
 - Hold device steady at 10-15cm distance from the barcode
@@ -578,11 +649,13 @@ This library supports a wide range of barcode formats across different categorie
 ### Build Issues
 
 **iOS:**
+
 ```bash
 cd ios && pod deintegrate && pod install && cd ..
 ```
 
 **Android:**
+
 ```bash
 cd android && ./gradlew clean && cd ..
 ```
@@ -615,7 +688,7 @@ We're constantly working to improve this library. Here are some planned enhancem
 ### Planned Features
 
 - [ ] **Barcode Generation** - Add ability to generate barcodes/QR codes
-- [ ] **Image Analysis** - Support scanning barcodes from gallery images
+- [x] **Image Analysis** - Support scanning barcodes from gallery images
 - [ ] **Advanced Camera Controls** - Zoom, focus, and exposure controls
 
 ---

@@ -17,6 +17,7 @@
     "@react-native/new-app-screen": "0.81.1",
     "react": "19.1.0",
     "react-native": "0.81.1",
+    "react-native-image-picker": "^8.2.1",
     "react-native-permissions": "^5.4.2",
     "react-native-safe-area-context": "^5.5.2"
   },

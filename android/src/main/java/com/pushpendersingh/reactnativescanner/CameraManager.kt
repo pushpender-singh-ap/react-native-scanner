@@ -3,7 +3,13 @@ package com.pushpendersingh.reactnativescanner
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Rect
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraControl
@@ -420,6 +426,134 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             throw e
         }
     }
+
+    fun scanImage(imageUri: String, callback: (WritableArray) -> Unit) {
+        try {
+            val uri = if (imageUri.startsWith("file://")) {
+                // Remove the prefix to get the path, then create a file Uri
+                // This handles encoded characters and ensures a clean file URI
+                val path = imageUri.replace("file://", "")
+                Uri.fromFile(java.io.File(path))
+            } else {
+                Uri.parse(imageUri)
+            }
+
+            Log.d(TAG, "Scanning image from URI: $uri")
+
+            // Strategy 1: Try InputImage.fromFilePath (Recommended)
+            // It handles Exif and memory efficiently
+            try {
+                val image = com.google.mlkit.vision.common.InputImage.fromFilePath(reactContext, uri)
+                processImage(image, callback)
+            } catch (e: java.io.IOException) {
+                Log.w(TAG, "InputImage.fromFilePath failed (${e.message}), falling back to Bitmap loader")
+                
+                // Strategy 2: Fallback to manual Bitmap loading
+                val bitmap = loadBitmap(uri)
+                if (bitmap != null) {
+                    Log.d(TAG, "Fallback Bitmap loaded: ${bitmap.width}x${bitmap.height}")
+                    val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
+                    processImage(image, callback)
+                } else {
+                    Log.e(TAG, "Failed to load bitmap from URI")
+                    callback(Arguments.createArray())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Scan image failed", e)
+            throw e
+        }
+    }
+
+    private fun processImage(image: com.google.mlkit.vision.common.InputImage, callback: (WritableArray) -> Unit) {
+        val scanner = BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
+                .build()
+        )
+
+        scanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                val results = Arguments.createArray()
+                for (barcode in barcodes) {
+                    if (!barcode.rawValue.isNullOrEmpty()) {
+                        results.pushMap(createBarcodeResult(barcode))
+                    }
+                }
+                Log.d(TAG, "Scan complete. Found ${barcodes.size} barcodes.")
+                callback(results)
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Barcode scanning failed: ${e.message}", e)
+                callback(Arguments.createArray())
+            }
+            .addOnCompleteListener {
+                scanner.close()
+            }
+    }
+
+
+    private fun loadBitmap(uri: Uri): Bitmap? {
+        try {
+            val inputStream = reactContext.contentResolver.openInputStream(uri)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+
+            if (originalBitmap == null) return null
+
+            // Handle Rotation
+            val rotation = getRotation(uri)
+            val matrix = Matrix()
+            if (rotation != 0) {
+                matrix.postRotate(rotation.toFloat())
+            }
+
+            // Handle Transparency: Draw on white background
+            // We create a new bitmap that is ARGB_8888 (no transparency issues for ML Kit)
+            val newBitmap = Bitmap.createBitmap(
+                if (rotation % 180 == 0) originalBitmap.width else originalBitmap.height,
+                if (rotation % 180 == 0) originalBitmap.height else originalBitmap.width,
+                Bitmap.Config.ARGB_8888
+            )
+            
+            val canvas = Canvas(newBitmap)
+            canvas.drawColor(Color.WHITE)
+            canvas.drawBitmap(originalBitmap, matrix, null)
+            
+            return newBitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading bitmap", e)
+            return null
+        }
+    }
+
+    private fun getRotation(uri: Uri): Int {
+        try {
+            val exifInterface = if (uri.scheme == "file") {
+                uri.path?.let { ExifInterface(it) }
+            } else {
+                // For content://, use inputStream (API 24+) or fallback to 0
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    reactContext.contentResolver.openInputStream(uri)?.use { 
+                        ExifInterface(it) 
+                    }
+                } else {
+                    null
+                }
+            }
+
+            return when (exifInterface?.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read Exif", e)
+            return 0
+        }
+    }
+
 
     fun releaseCamera() {
         try {

@@ -156,6 +156,17 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  @ReactMethod
+  override fun scanImage(imageUri: String, promise: Promise) {
+    try {
+      cameraManager.scanImage(imageUri) { result ->
+        promise.resolve(result)
+      }
+    } catch (e: Exception) {
+      promise.reject("SCAN_IMAGE_ERROR", e.message, e)
+    }
+  }
+
   override fun invalidate() {
     super.invalidate()
     permissionPromise = null

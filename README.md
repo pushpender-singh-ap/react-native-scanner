@@ -67,8 +67,6 @@ cd ios && pod install && cd ..
 ```xml
 <key>NSCameraUsageDescription</key>
 <string>We need camera access to scan barcodes</string>
-<key>NSPhotoLibraryUsageDescription</key>
-<string>We need access to your photo library to scan barcodes from images</string>
 ```
 
 ### Android Setup
@@ -77,8 +75,6 @@ Add camera permission to `AndroidManifest.xml`:
 
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 <uses-feature android:name="android.hardware.camera" />
 ```
 
@@ -186,7 +182,9 @@ const styles = StyleSheet.create({
 
 ### Scanning from Image (Gallery)
 
-You can also scan QR codes and barcodes from existing images (e.g., from the gallery).
+You can also scan QR codes and barcodes from existing images (e.g., from the gallery). This library only requires the image file path - it does not handle image picking.
+
+To pick images from the gallery, you'll need a third-party library like [`react-native-image-picker`](https://github.com/react-native-image-picker/react-native-image-picker). Please refer to that library's documentation for setup and required permissions (e.g., `NSPhotoLibraryUsageDescription` for iOS, `READ_MEDIA_IMAGES` for Android).
 
 ```tsx
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -244,6 +242,8 @@ BarcodeScanner.startScanning((barcodes: BarcodeResult[]) => {
 #### `scanImage(imageUri)`
 
 Scans a static image for barcodes. This is useful for scanning QR codes from gallery images, screenshots, or when live camera scanning fails on low-end devices.
+
+**Note:** This method only requires the image file path/URI. It does not handle image picking - you'll need a third-party library like [`react-native-image-picker`](https://github.com/react-native-image-picker/react-native-image-picker) to select images from the gallery.
 
 ```typescript
 const barcodes = await BarcodeScanner.scanImage('file:///path/to/image.jpg');

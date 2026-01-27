@@ -453,7 +453,7 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                 if (bitmap != null) {
                     Log.d(TAG, "Fallback Bitmap loaded: ${bitmap.width}x${bitmap.height}")
                     val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
-                    processImage(image, callback)
+                    processImage(image, callback, bitmap) // Pass bitmap for cleanup after processing
                 } else {
                     Log.e(TAG, "Failed to load bitmap from URI")
                     callback(Arguments.createArray())
@@ -465,7 +465,17 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
         }
     }
 
-    private fun processImage(image: com.google.mlkit.vision.common.InputImage, callback: (WritableArray) -> Unit) {
+    /**
+     * Process image for barcode scanning.
+     * @param image The InputImage to scan
+     * @param callback Callback to receive scan results
+     * @param bitmapToRecycle Optional bitmap to recycle after processing completes (for memory cleanup)
+     */
+    private fun processImage(
+        image: com.google.mlkit.vision.common.InputImage, 
+        callback: (WritableArray) -> Unit,
+        bitmapToRecycle: Bitmap? = null
+    ) {
         val scanner = BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
@@ -489,6 +499,13 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             }
             .addOnCompleteListener {
                 scanner.close()
+                // Recycle bitmap after processing to free memory
+                bitmapToRecycle?.let { bitmap ->
+                    if (!bitmap.isRecycled) {
+                        bitmap.recycle()
+                        Log.d(TAG, "Recycled bitmap after image processing")
+                    }
+                }
             }
     }
 
@@ -519,6 +536,9 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             val canvas = Canvas(newBitmap)
             canvas.drawColor(Color.WHITE)
             canvas.drawBitmap(originalBitmap, matrix, null)
+            
+            // Recycle original bitmap as it's no longer needed
+            originalBitmap.recycle()
             
             return newBitmap
         } catch (e: Exception) {

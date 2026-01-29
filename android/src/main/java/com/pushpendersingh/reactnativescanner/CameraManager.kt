@@ -29,8 +29,11 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -49,21 +52,26 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
     private var preview: Preview? = null
     private var previewView: PreviewView? = null
     
-    // AtomicBoolean for lock-free scanning flag
     private val isScanning = AtomicBoolean(false)
-    // AtomicReference for thread-safe callback
     private val scanCallbackRef = AtomicReference<((WritableArray) -> Unit)?>(null)
     
-    // Lock for synchronizing camera binding operations
     private val cameraBindLock = ReentrantLock()
-    // Flag to prevent concurrent binding
     @Volatile
     private var isBinding = false
-    // Lock for executor lifecycle management
     private val executorLock = ReentrantLock()
 
     companion object {
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private const val MAX_BITMAP_PIXELS = 4_000_000 // ~4MP (2000×2000) for first attempt
+        private const val FALLBACK_MAX_PIXELS = 8_000_000 // ~8MP for retry with higher resolution
+        private const val MAX_CLEANUP_RETRIES = 10 // Max retries for performFullCleanup
+        private val threadCount = AtomicInteger(0)
+    }
+    
+    private val executorThreadFactory = ThreadFactory { r ->
+        Thread(r, "CameraManager-${threadCount.incrementAndGet()}").apply {
+            isDaemon = true
+        }
     }
 
     fun hasCameraPermission(): Boolean {
@@ -92,7 +100,7 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
     private fun ensureExecutor() {
         executorLock.withLock {
             if (cameraExecutor.isShutdown) {
-                cameraExecutor = Executors.newSingleThreadExecutor()
+                cameraExecutor = Executors.newSingleThreadExecutor(executorThreadFactory)
                 Log.d(TAG, "♻️ Recreated camera executor")
             }
         }
@@ -427,54 +435,101 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
         }
     }
 
+    /**
+     * All file operations are performed on background thread.
+     * Callback is always dispatched to main thread for React Native compatibility.
+     */
     fun scanImage(imageUri: String, callback: (WritableArray) -> Unit) {
-        try {
-            val uri = if (imageUri.startsWith("file://")) {
-                // Remove the prefix to get the path, then create a file Uri
-                // This handles encoded characters and ensures a clean file URI
-                val path = imageUri.replace("file://", "")
-                Uri.fromFile(java.io.File(path))
-            } else {
-                Uri.parse(imageUri)
+        // Validate imageUri before processing
+        if (imageUri.isBlank()) {
+            Log.w(TAG, "scanImage called with blank imageUri")
+            ContextCompat.getMainExecutor(reactContext).execute {
+                callback(Arguments.createArray())
             }
+            return
+        }
+        
+        // Ensure executor is available
+        ensureExecutor()
+        
+        // Execute all file I/O on background thread
+        // Wrap in try-catch to handle race condition where executor could be shutdown
+        // between ensureExecutor() and execute()
+        try {
+            cameraExecutor.execute {
+                try {
+                    val uri = if (imageUri.startsWith("file://")) {
+                        val path = imageUri.replace("file://", "")
+                        Uri.fromFile(java.io.File(path))
+                    } else {
+                        Uri.parse(imageUri)
+                    }
 
-            Log.d(TAG, "Scanning image from URI: $uri")
+                    Log.d(TAG, "Scanning image from URI: $uri")
 
-            // Strategy 1: Try InputImage.fromFilePath (Recommended)
-            // It handles Exif and memory efficiently
-            try {
-                val image = com.google.mlkit.vision.common.InputImage.fromFilePath(reactContext, uri)
-                processImage(image, callback)
-            } catch (e: java.io.IOException) {
-                Log.w(TAG, "InputImage.fromFilePath failed (${e.message}), falling back to Bitmap loader")
-                
-                // Strategy 2: Fallback to manual Bitmap loading
-                val bitmap = loadBitmap(uri)
-                if (bitmap != null) {
-                    Log.d(TAG, "Fallback Bitmap loaded: ${bitmap.width}x${bitmap.height}")
-                    val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
-                    processImage(image, callback, bitmap) // Pass bitmap for cleanup after processing
-                } else {
-                    Log.e(TAG, "Failed to load bitmap from URI")
-                    callback(Arguments.createArray())
+                    // Try InputImage.fromFilePath
+                    // It handles Exif and memory efficiently
+                    try {
+                        val image = com.google.mlkit.vision.common.InputImage.fromFilePath(reactContext, uri)
+                        processImageOnBackground(image, null, uri, false, callback)
+                    } catch (e: java.io.IOException) {
+                        Log.w(TAG, "InputImage.fromFilePath failed (${e.message}), falling back to Bitmap loader")
+                        // Fallback to manual Bitmap loading with size limits
+                        scanImageWithRetry(uri, callback, isRetry = false)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Scan image failed", e)
+                    // Always callback on main thread, even on error
+                    ContextCompat.getMainExecutor(reactContext).execute {
+                        callback(Arguments.createArray())
+                    }
                 }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Scan image failed", e)
-            throw e
+        } catch (e: RejectedExecutionException) {
+            Log.w(TAG, "Executor was shutdown, cannot scan image: ${e.message}")
+            ContextCompat.getMainExecutor(reactContext).execute {
+                callback(Arguments.createArray())
+            }
+        }
+    }
+    
+    /**
+     * Retry mechanism with higher resolution if first scan fails
+     * First attempt uses MAX_BITMAP_PIXELS (4MP), retry uses FALLBACK_MAX_PIXELS (8MP)
+     */
+    private fun scanImageWithRetry(
+        uri: Uri,
+        callback: (WritableArray) -> Unit,
+        isRetry: Boolean = false
+    ) {
+        val maxPixels = if (isRetry) FALLBACK_MAX_PIXELS else MAX_BITMAP_PIXELS
+        val bitmap = loadBitmap(uri, maxPixels)
+        
+        if (bitmap != null) {
+            Log.d(TAG, "Bitmap loaded: ${bitmap.width}x${bitmap.height}, isRetry=$isRetry")
+            val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
+            processImageOnBackground(image, bitmap, uri, isRetry, callback)
+        } else {
+            Log.e(TAG, "Failed to load bitmap from URI")
+            // Always callback on main thread
+            ContextCompat.getMainExecutor(reactContext).execute {
+                callback(Arguments.createArray())
+            }
         }
     }
 
     /**
-     * Process image for barcode scanning.
-     * @param image The InputImage to scan
-     * @param callback Callback to receive scan results
-     * @param bitmapToRecycle Optional bitmap to recycle after processing completes (for memory cleanup)
+     * Process image for barcode scanning (for static images).
+     * Includes retry logic if no barcodes found on first attempt.
+     * Always calls callback, even on error.
+     * Callback is always dispatched to main thread.
      */
-    private fun processImage(
-        image: com.google.mlkit.vision.common.InputImage, 
-        callback: (WritableArray) -> Unit,
-        bitmapToRecycle: Bitmap? = null
+    private fun processImageOnBackground(
+        image: com.google.mlkit.vision.common.InputImage,
+        bitmapToRecycle: Bitmap?,
+        uri: Uri,
+        isRetry: Boolean,
+        callback: (WritableArray) -> Unit
     ) {
         val scanner = BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder()
@@ -482,6 +537,9 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                 .build()
         )
 
+        // Flag to track if we're retrying (to avoid double cleanup in onCompleteListener)
+        var didRetry = false
+        
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
                 val results = Arguments.createArray()
@@ -491,42 +549,112 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
                     }
                 }
                 Log.d(TAG, "Scan complete. Found ${barcodes.size} barcodes.")
-                callback(results)
+                
+                // Retry with higher resolution if no results and not already retrying
+                if (results.size() == 0 && !isRetry && bitmapToRecycle != null) {
+                    Log.d(TAG, "No barcodes found, retrying with higher resolution")
+                    didRetry = true
+                    // Recycle current bitmap before retry
+                    if (!bitmapToRecycle.isRecycled) {
+                        bitmapToRecycle.recycle()
+                    }
+                    scanner.close()
+                    scanImageWithRetry(uri, callback, isRetry = true)
+                } else {
+                    // Dispatch callback to main thread
+                    ContextCompat.getMainExecutor(reactContext).execute {
+                        callback(results)
+                    }
+                }
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "Barcode scanning failed: ${e.message}", e)
-                callback(Arguments.createArray())
+                // Always callback on main thread
+                ContextCompat.getMainExecutor(reactContext).execute {
+                    callback(Arguments.createArray())
+                }
             }
             .addOnCompleteListener {
-                scanner.close()
-                // Recycle bitmap after processing to free memory
-                bitmapToRecycle?.let { bitmap ->
-                    if (!bitmap.isRecycled) {
-                        bitmap.recycle()
-                        Log.d(TAG, "Recycled bitmap after image processing")
+                // Only cleanup if we didn't retry (retry handles its own cleanup)
+                if (!didRetry) {
+                    scanner.close()
+                    // Recycle bitmap after processing to free memory
+                    bitmapToRecycle?.let { bitmap ->
+                        if (!bitmap.isRecycled) {
+                            bitmap.recycle()
+                            Log.d(TAG, "Recycled bitmap after image processing")
+                        }
                     }
                 }
             }
     }
 
-
-    private fun loadBitmap(uri: Uri): Bitmap? {
+    /**
+     * Load bitmap with size limits to prevent OOM.
+     * Uses two-pass decoding: first decode bounds only, then decode with sample size.
+     * @param uri The URI of the image to load
+     * @param maxPixels Maximum pixels allowed (width * height)
+     */
+    private fun loadBitmap(uri: Uri, maxPixels: Int = MAX_BITMAP_PIXELS): Bitmap? {
         try {
-            val inputStream = reactContext.contentResolver.openInputStream(uri)
-            val originalBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
+            // Decode bounds only (no memory allocation)
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            reactContext.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+            
+            if (options.outWidth <= 0 || options.outHeight <= 0) {
+                Log.e(TAG, "Failed to decode image bounds")
+                return null
+            }
+            
+            // Calculate sample size for memory efficiency
+            // Use Long arithmetic to prevent integer overflow for very large images
+            // (e.g., 50000×50000 = 2.5 billion pixels exceeds Int.MAX_VALUE)
+            val currentPixels = options.outWidth.toLong() * options.outHeight.toLong()
+            options.inSampleSize = if (currentPixels > maxPixels) {
+                calculateInSampleSize(options.outWidth, options.outHeight, maxPixels)
+            } else {
+                1
+            }
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888
+            
+            Log.d(TAG, "Loading bitmap: ${options.outWidth}x${options.outHeight}, sampleSize=${options.inSampleSize}")
+            
+            // Decode with sample size
+            val originalBitmap = reactContext.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
 
-            if (originalBitmap == null) return null
+            if (originalBitmap == null) {
+                Log.e(TAG, "Failed to decode bitmap")
+                return null
+            }
 
             // Handle Rotation
+            // postRotate() rotates around origin (0,0), so we need to translate
+            // the rotated image back into the visible canvas area
             val rotation = getRotation(uri)
             val matrix = Matrix()
-            if (rotation != 0) {
-                matrix.postRotate(rotation.toFloat())
+            when (rotation) {
+                90 -> {
+                    matrix.postRotate(90f)
+                    matrix.postTranslate(originalBitmap.height.toFloat(), 0f)
+                }
+                180 -> {
+                    matrix.postRotate(180f)
+                    matrix.postTranslate(originalBitmap.width.toFloat(), originalBitmap.height.toFloat())
+                }
+                270 -> {
+                    matrix.postRotate(270f)
+                    matrix.postTranslate(0f, originalBitmap.width.toFloat())
+                }
             }
 
             // Handle Transparency: Draw on white background
-            // We create a new bitmap that is ARGB_8888 (no transparency issues for ML Kit)
             val newBitmap = Bitmap.createBitmap(
                 if (rotation % 180 == 0) originalBitmap.width else originalBitmap.height,
                 if (rotation % 180 == 0) originalBitmap.height else originalBitmap.width,
@@ -545,6 +673,20 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             Log.e(TAG, "Error loading bitmap", e)
             return null
         }
+    }
+    
+    /**
+     * Calculate inSampleSize to downsample image to target pixel count.
+     * Uses power of 2 sampling for efficient decoding.
+     */
+    private fun calculateInSampleSize(width: Int, height: Int, maxPixels: Int): Int {
+        // Use Long arithmetic to prevent integer overflow for very large images
+        val pixels = width.toLong() * height.toLong()
+        var inSampleSize = 1
+        while ((pixels / (inSampleSize * inSampleSize)) > maxPixels) {
+            inSampleSize *= 2
+        }
+        return inSampleSize
     }
 
     private fun getRotation(uri: Uri): Int {
@@ -575,37 +717,62 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
     }
 
 
+    /**
+     * Release camera resources asynchronously.
+     * Full cleanup INCLUDING executor shutdown.
+     * Executor shutdown is scheduled on main thread to avoid deadlock.
+     */
     fun releaseCamera() {
+        Log.d(TAG, "🧹 releaseCamera() called")
+        
+        // Stop scanning first using atomic operation
+        if (isScanning.compareAndSet(true, false)) {
+            scanCallbackRef.set(null)
+        }
+
+        // Clear the analyzer immediately to stop processing new frames
+        imageAnalysis?.clearAnalyzer()
+        
+        // Schedule cleanup on main thread (non-blocking)
+        ContextCompat.getMainExecutor(reactContext).execute {
+            performFullCleanup()
+        }
+    }
+    
+    /**
+     * Full cleanup on main thread including executor shutdown.
+     * Guards against race condition: if scanning restarted, skip cleanup.
+     */
+    private fun performFullCleanup(retryCount: Int = 0) {
         try {
-            Log.d(TAG, "Releasing camera resources...")
-            
-            // Stop scanning first using atomic operation
-            if (isScanning.compareAndSet(true, false)) {
-                scanCallbackRef.set(null)
-            }
-
-            // Wait for binding to complete WITHOUT holding the lock
-            // This prevents deadlock when startScanning() is called during release
-            var attempts = 0
-            while (isBinding && attempts < 100) { // Max wait: 5 seconds
-                Log.d(TAG, "⏳ Waiting for camera binding to complete before release...")
-                Thread.sleep(50)
-                attempts++
+            // Race condition guard: if scanning restarted, skip this cleanup
+            if (isScanning.get()) {
+                Log.d(TAG, "⏭️ Skipping cleanup - scanning was restarted")
+                return
             }
             
+            // Handle binding in progress with retry and max retry limit
             if (isBinding) {
-                Log.w(TAG, "⚠️ Binding still in progress after 5s, forcing release")
-            }
-
-            // Now safely unbind with lock (binding should be complete)
-            cameraBindLock.withLock {
-                // Double-check binding state and unbind
-                if (isBinding) {
-                    Log.w(TAG, "⚠️ Binding flag still set, unbinding anyway")
+                if (retryCount >= MAX_CLEANUP_RETRIES) {
+                    Log.e(TAG, "❌ Max cleanup retries ($MAX_CLEANUP_RETRIES) reached, forcing cleanup")
+                    // Force reset isBinding flag and continue with cleanup
+                    cameraBindLock.withLock {
+                        isBinding = false
+                    }
+                } else {
+                    Log.d(TAG, "⏳ Binding in progress, scheduling delayed cleanup (retry ${retryCount + 1}/$MAX_CLEANUP_RETRIES)")
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        performFullCleanup(retryCount + 1)
+                    }, 100)
+                    return
                 }
+            }
+            
+            // Unbind camera
+            cameraBindLock.withLock {
                 cameraProvider?.unbindAll()
             }
-        
+            
             // Clear all references
             cameraProvider = null
             cameraControl = null
@@ -613,30 +780,30 @@ class CameraManager(private val reactContext: ReactApplicationContext) {
             preview = null
             previewView = null
             scanCallbackRef.set(null)
-        
+            
             // Close the barcode scanner
             scanner?.close()
             scanner = null
-        
-            // Use dedicated executor lock for shutdown
-            // This prevents race with ensureExecutor() and getExecutorSafely()
-            executorLock.withLock {
-                if (!cameraExecutor.isShutdown) {
-                    cameraExecutor.shutdown()
-                    try {
-                        if (!cameraExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+            
+            // Shutdown executor on a separate thread to avoid blocking main thread
+            Thread {
+                executorLock.withLock {
+                    if (!cameraExecutor.isShutdown) {
+                        cameraExecutor.shutdown()
+                        try {
+                            if (!cameraExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                                cameraExecutor.shutdownNow()
+                                Log.w(TAG, "⚠️ Executor forced shutdown")
+                            }
+                        } catch (e: InterruptedException) {
                             cameraExecutor.shutdownNow()
-                            Log.w(TAG, "⚠️ Executor did not terminate gracefully, forced shutdown")
+                            Thread.currentThread().interrupt()
                         }
-                    } catch (e: InterruptedException) {
-                        cameraExecutor.shutdownNow()
-                        Thread.currentThread().interrupt()
-                        Log.w(TAG, "⚠️ Executor shutdown interrupted")
                     }
                 }
-            }
-        
-            Log.d(TAG, "✅ Camera resources released successfully")
+                Log.d(TAG, "✅ Camera fully released (including executor)")
+            }.start()
+            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error releasing camera: ${e.message}", e)
         }

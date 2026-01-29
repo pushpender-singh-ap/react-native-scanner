@@ -21,6 +21,24 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
   private val cameraManager: CameraManager = CameraManager(reactContext)
   private var permissionPromise: Promise? = null
   
+  // Track permission request time for timeout-based cleanup
+  private var permissionRequestTime: Long = 0
+  private val PERMISSION_TIMEOUT_MS = 60_000L  // 1 minute timeout
+  
+  // Lifecycle listener to clean up permission promise on activity destroy
+  private val lifecycleEventListener = object : com.facebook.react.bridge.LifecycleEventListener {
+    override fun onHostResume() {}
+    override fun onHostPause() {}
+    override fun onHostDestroy() {
+      permissionPromise?.reject("ACTIVITY_DESTROYED", "Activity was destroyed before permission result")
+      permissionPromise = null
+    } 
+  }
+  
+  init {
+    reactContext.addLifecycleEventListener(lifecycleEventListener)
+  }
+  
   private val permissionListener = PermissionListener { requestCode, permissions, grantResults ->
     if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
       // Validate that we're handling the correct permission
@@ -126,6 +144,16 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
         return
       }
 
+      // Clear stale permission promise based on timeout
+      if (permissionPromise != null) {
+        val elapsed = System.currentTimeMillis() - permissionRequestTime
+        if (elapsed > PERMISSION_TIMEOUT_MS) {
+          android.util.Log.w(NAME, "Clearing stale permission promise after ${elapsed}ms")
+          permissionPromise?.reject("PERMISSION_TIMEOUT", "Permission request timed out")
+          permissionPromise = null
+        }
+      }
+
       // Check if there's already a pending permission request
       if (permissionPromise != null) {
         promise.reject(
@@ -137,6 +165,7 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
 
       // Store promise to be resolved in permission callback
       permissionPromise = promise
+      permissionRequestTime = System.currentTimeMillis()  // Track request time
       
       // Request permission using PermissionAwareActivity
       val permissionAwareActivity = currentActivity as? PermissionAwareActivity
@@ -169,7 +198,9 @@ class ReactNativeScannerModule(reactContext: ReactApplicationContext) :
 
   override fun invalidate() {
     super.invalidate()
+    permissionPromise?.reject("MODULE_INVALIDATED", "Scanner module was invalidated")
     permissionPromise = null
+    reactApplicationContext.removeLifecycleEventListener(lifecycleEventListener)
     cameraManager.releaseCamera()
   }
 

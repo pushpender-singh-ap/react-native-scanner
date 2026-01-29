@@ -46,6 +46,19 @@
   }
 }
 
+- (void)scanImage:(NSString *)imageUri
+          resolve:(RCTPromiseResolveBlock)resolve
+           reject:(RCTPromiseRejectBlock)reject {
+  @try {
+    [_cameraManager scanImage:imageUri
+                   completion:^(NSArray *result) {
+                     resolve(result);
+                   }];
+  } @catch (NSException *exception) {
+    reject(@"SCAN_IMAGE_ERROR", exception.reason, nil);
+  }
+}
+
 - (void)stopScanning:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject {
   @try {

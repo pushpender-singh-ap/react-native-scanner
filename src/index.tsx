@@ -38,6 +38,9 @@ export type BarcodeScannerCallback = (results: BarcodeResult[]) => void;
 export class BarcodeScanner {
   private static listener: any = null;
 
+  // Allowed URI schemes for scanImage
+  private static readonly ALLOWED_SCHEMES = ['file://', 'content://', 'ph://'];
+
   static async startScanning(callback: BarcodeScannerCallback): Promise<void> {
     // Remove existing listener
     if (this.listener) {
@@ -83,6 +86,32 @@ export class BarcodeScanner {
 
   static async requestCameraPermission(): Promise<boolean> {
     return NativeReactNativeScanner.requestCameraPermission();
+  }
+
+  static async scanImage(imageUri: string): Promise<BarcodeResult[]> {
+    // Validate input type
+    if (!imageUri || typeof imageUri !== 'string') {
+      throw new Error('Invalid image URI: must be a non-empty string');
+    }
+
+    // Block path traversal
+    if (imageUri.includes('..')) {
+      throw new Error('Invalid image URI: path traversal not allowed');
+    }
+
+    // Validate scheme (allow file://, content://, ph://)
+    const hasValidScheme = this.ALLOWED_SCHEMES.some((scheme) =>
+      imageUri.startsWith(scheme)
+    );
+    if (!hasValidScheme) {
+      throw new Error(
+        `Invalid image URI: unsupported scheme. Use: ${this.ALLOWED_SCHEMES.join(', ')}`
+      );
+    }
+
+    return NativeReactNativeScanner.scanImage(imageUri) as unknown as Promise<
+      BarcodeResult[]
+    >;
   }
 }
 

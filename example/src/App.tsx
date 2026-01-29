@@ -14,6 +14,7 @@ import BarcodeScanner, {
   type BarcodeResult,
   CameraView,
 } from '@pushpendersingh/react-native-scanner';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function App() {
@@ -89,6 +90,42 @@ export default function App() {
       console.log('Camera released');
     } catch (error: any) {
       console.error('Error releasing camera:', error);
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+      });
+
+      if (result.didCancel) {
+        console.log('User cancelled image picker');
+      } else if (result.errorMessage) {
+        console.error('ImagePicker Error: ', result.errorMessage);
+        Alert.alert('Error', result.errorMessage);
+      } else if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        if (asset && asset.uri) {
+          console.log('Scanning image:', asset.uri);
+          try {
+            const barcodes = await BarcodeScanner.scanImage(asset.uri);
+            handleBarcodeScanned(barcodes);
+            if (barcodes.length === 0) {
+              Alert.alert(
+                'No QR Code Found',
+                'Could not detect any QR code in the selected image.'
+              );
+            }
+          } catch (e: any) {
+            console.error('Scan Error:', e);
+            Alert.alert('Error', 'Failed to scan image');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Pick Image Error:', e);
     }
   };
 
@@ -195,6 +232,10 @@ export default function App() {
           onPress={releaseCamera}
         >
           <Text style={styles.buttonSecondaryText}>🔓 Release Camera</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.buttonSecondary} onPress={pickImage}>
+          <Text style={styles.buttonSecondaryText}>🖼️ Scan from Gallery</Text>
         </TouchableOpacity>
       </View>
 

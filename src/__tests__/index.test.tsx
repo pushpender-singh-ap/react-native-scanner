@@ -11,6 +11,7 @@ jest.mock('../NativeReactNativeScanner', () => ({
   releaseCamera: jest.fn(),
   hasCameraPermission: jest.fn(),
   requestCameraPermission: jest.fn(),
+  scanImage: jest.fn(),
 }));
 
 describe('BarcodeScanner', () => {
@@ -96,6 +97,28 @@ describe('BarcodeScanner', () => {
 
     expect(hasPermission).toBe(true);
     expect(NativeReactNativeScanner.hasCameraPermission).toHaveBeenCalled();
+  });
+
+  // Test 6: Scan image
+  test('should scan image from uri', async () => {
+    const mockImageUri = 'file:///path/to/image.jpg';
+    const mockBarcodeResults: BarcodeResult[] = [
+      {
+        data: 'QR_CODE_DATA',
+        type: 'QR_CODE' as BarcodeType,
+      },
+    ];
+
+    (NativeReactNativeScanner.scanImage as jest.Mock).mockResolvedValue(
+      mockBarcodeResults
+    );
+
+    const results = await BarcodeScanner.scanImage(mockImageUri);
+
+    expect(NativeReactNativeScanner.scanImage).toHaveBeenCalledWith(
+      mockImageUri
+    );
+    expect(results).toEqual(mockBarcodeResults);
   });
 
   // Test 6: Request camera permission

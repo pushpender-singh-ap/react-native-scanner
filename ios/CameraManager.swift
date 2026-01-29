@@ -7,6 +7,8 @@
 
 @preconcurrency import AVFoundation
 import Foundation
+import UIKit
+import CoreImage
 @preconcurrency import Vision
 
 // Actor that manages camera session state and operations
@@ -339,6 +341,140 @@ actor CallbackActor {
         }
     }
 
+    @objc public func scanImage(_ imagePath: String, completion: @escaping ([[String: Any]]) -> Void) {
+        // Ensure completion is called exactly once
+        let completionLock = NSLock()
+        var hasCompleted = false
+        
+        let safeCompletion: ([[String: Any]]) -> Void = { results in
+            completionLock.lock()
+            defer { completionLock.unlock() }
+            if !hasCompleted {
+                hasCompleted = true
+                Task { @MainActor in
+                    completion(results)
+                }
+            }
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // Wrap in autoreleasepool for proper memory management on background thread
+            autoreleasepool {
+                // Always call completion, even if CameraManager is deallocated
+                guard let self = self else {
+                    safeCompletion([["error": "cancelled", "reason": "CameraManager deallocated"]])
+                    return
+                }
+                
+                let path: String
+                if imagePath.hasPrefix("file://") {
+                     if let url = URL(string: imagePath) {
+                         path = url.path
+                     } else {
+                         // Try to strip file:// manually if URL parsing fails
+                         path = String(imagePath.dropFirst(7))
+                     }
+                } else {
+                    path = imagePath
+                }
+                
+                // Load image and extract what we need, allowing UIImage to be released earlier
+                guard let image = UIImage(contentsOfFile: path),
+                      let cgImage = image.cgImage else {
+                    print("Failed to load image from path: \(path)")
+                    safeCompletion([])
+                    return
+                }
+
+                // Get orientation before we might release the UIImage reference
+                let orientation = self.cgImageOrientation(from: image.imageOrientation)
+                
+                // Keep a reference to the original image for CIDetector fallback
+                // This is needed because CIImage(image:) may be more reliable for orientation
+                let originalImage = image
+                
+                let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+                let request = VNDetectBarcodesRequest { [weak self] request, error in
+                    // Always call completion, even if CameraManager is deallocated
+                    guard let self = self else {
+                        safeCompletion([["error": "cancelled", "reason": "CameraManager deallocated"]])
+                        return
+                    }
+                    
+                    // 1. Check Vision Results
+                    if error == nil, let observations = request.results as? [VNBarcodeObservation], !observations.isEmpty {
+                        var results: [[String: Any]] = []
+                        for barcode in observations {
+                            if let payloadString = barcode.payloadStringValue {
+                                results.append(self.createBarcodeResult(barcode: barcode, payloadString: payloadString))
+                            }
+                        }
+                        if !results.isEmpty {
+                            safeCompletion(results)
+                            return
+                        }
+                    }
+                    
+                    // 2. Fallback to CIDetector if Vision fails or returns empty
+                    print("Vision returned no results, trying CIDetector fallback...")
+                    
+                    // Create CIImage from UIImage to preserve orientation
+                    // CIImage(image:) returns an optional CIImage?
+                    // CIImage(cgImage:) returns a non-optional CIImage
+                    let ciImage: CIImage? = CIImage(image: originalImage) ?? CIImage(cgImage: cgImage)
+                    
+                    guard let finalCIImage = ciImage else {
+                        safeCompletion([])
+                        return
+                    }
+                    
+                    let context = CIContext()
+                    let options = [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+                    let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: context, options: options)
+                    
+                    // Use CIDetector features
+                    // Note: CIImage(image: UIImage) should handle orientation automatically
+                    let features = detector?.features(in: finalCIImage) as? [CIQRCodeFeature]
+                    
+                    var fallbackResults: [[String: Any]] = []
+                    if let features = features {
+                        for feature in features {
+                            if feature.messageString != nil {
+                                fallbackResults.append(self.createFallbackResult(feature: feature))
+                            }
+                        }
+                    }
+                    
+                    print("CIDetector found \(fallbackResults.count) results")
+                    safeCompletion(fallbackResults)
+                }
+                
+                request.symbologies = self.supportedBarcodeTypes
+                
+                do {
+                    try handler.perform([request])
+                } catch {
+                    print("Failed to perform barcode request: \(error)")
+                    safeCompletion([])
+                }
+            }
+        }
+    }
+    
+    private func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch uiOrientation {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
+        }
+    }
+
     @objc public func enableFlashlight() {
         // Execute on sessionQueue for thread safety
         sessionQueue.async { [weak self] in
@@ -616,6 +752,29 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             ],
         ]
 
+        result["bounds"] = bounds
+
+        return result
+    }
+
+    private func createFallbackResult(feature: CIQRCodeFeature) -> [String: Any] {
+        var result: [String: Any] = [
+            "data": feature.messageString ?? "",
+            "type": "QR_CODE"
+        ]
+
+        // Add bounds if needed (converting from CoreImage coordinates to 4-corner format)
+        let boundingBox = feature.bounds
+        let bounds: [String: Any] = [
+            "width": boundingBox.width,
+            "height": boundingBox.height,
+            "origin": [
+                "topLeft": ["x": boundingBox.minX, "y": boundingBox.maxY],
+                "bottomLeft": ["x": boundingBox.minX, "y": boundingBox.minY],
+                "bottomRight": ["x": boundingBox.maxX, "y": boundingBox.minY],
+                "topRight": ["x": boundingBox.maxX, "y": boundingBox.maxY],
+            ],
+        ]
         result["bounds"] = bounds
 
         return result
